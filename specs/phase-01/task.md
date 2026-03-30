@@ -16,10 +16,10 @@
 9. [x] Implement `utils/auditLogger.js` to support transactional logging.
 
 ## 🧩 Milestone 3: Document Core Routing
-10. [ ] Numbering Utility: Atomic `generateNumber` (uses `doc_number_sequences`).
-11. [ ] Document Creation: `POST /documents` (uses multipart/form-data, transactions for Doc + Outward Number + Audit Log).
-12. [ ] Inbox Query: `GET /documents/inbox` (scoped to worker department, unclaimed docs).
-13. [ ] Pickup Logic: `POST /documents/:id/pickup` (UPDATE...WHERE... check, generate Inward Number, transactions).
+10. [x] Numbering Utility: Atomic `generateNumber` (uses `doc_number_sequences`).
+11. [x] Document Creation: `POST /documents` (uses multipart/form-data, transactions for Doc + Outward Number + Audit Log).
+12. [x] Inbox Query: `GET /documents/inbox` (scoped to worker department, unclaimed docs).
+13. [x] Pickup Logic: `POST /documents/:id/pickup` (UPDATE...WHERE... check, generate Inward Number, transactions).
 
 ## 🧩 Milestone 4: Document Lifecycle & Auditing
 14. [ ] Processing Logic: `POST /documents/:id/start`, `POST /documents/:id/complete`.

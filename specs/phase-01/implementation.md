@@ -28,4 +28,7 @@
 - [x] Implement User Module (Milestone 2)
 - [x] Implement Audit Logger Utility (Milestone 2)
 - [x] Implement Audit Module (Milestone 5)
-- [ ] Implement Document Numbering Utility (Milestone 3)
+- [x] Implement Document Numbering Utility (Milestone 3)
+- [x] Implement Document Creation & Inbox (Milestone 3)
+- [x] Implement Document Pickup Logic (Milestone 3)
+- [ ] Implement Document Forwarding & Processing (Milestone 4)

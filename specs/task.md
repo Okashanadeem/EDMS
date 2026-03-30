@@ -17,10 +17,10 @@
 - [x] Department Module: CRUD for departments (Super Admin only)
 
 ### 🧩 Milestone 3: Core Document Workflow
-- [ ] Numbering Utility: Inward/Outward atomic generator
-- [ ] Document Module: Create and Dispatch (`POST /documents`)
-- [ ] Document Module: Department Inbox query (`GET /documents/inbox`)
-- [ ] Document Module: Atomic Pickup logic (`POST /documents/:id/pickup`)
+- [x] Numbering Utility: Inward/Outward atomic generator
+- [x] Document Module: Create and Dispatch (`POST /documents`)
+- [x] Document Module: Department Inbox query (`GET /documents/inbox`)
+- [x] Document Module: Atomic Pickup logic (`POST /documents/:id/pickup`)
 - [ ] Document Module: Document Forwarding with new outward numbers
 - [ ] Document Module: Processing (Start, Complete)
 
