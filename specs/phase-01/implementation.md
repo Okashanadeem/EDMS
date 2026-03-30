@@ -1,0 +1,19 @@
+# Phase 01: Implementation Logs & Decisions
+
+## 📅 Log: 2026-03-30
+- **Status:** Initial Planning
+- **Activity:** Created `specs/` system for tracking project milestones and execution logs.
+- **Outcome:** Global roadmap (Phase 1/2) and detailed Phase 1 task breakdown established.
+
+## 🛠️ Code-Level Decisions
+- **Backend Architecture:** Adopted a modular folder structure (`src/modules/auth`, `src/modules/documents`, etc.) to isolate concerns and improve maintainability.
+- **Frontend Architecture:** Chose React with a centralized `AuthContext` to manage JWT and user profile, simplifying role-based UI conditional rendering.
+- **Database Logic:** All document state changes will use PostgreSQL `BEGIN`, `COMMIT`, `ROLLBACK` for transactional integrity.
+
+## ⚠️ Challenges & Fixes
+- **Challenge:** Handling race conditions when multiple workers click "Pick Up" simultaneously.
+- **Fix:** Implemented an atomic database `UPDATE` with a `WHERE assigned_to IS NULL` clause. If the affected rows count is 0, the backend returns a `409 Conflict`, which the frontend handles via a "Someone else picked this up" toast.
+
+## 🚧 Current Work
+- [x] Establish Phase 1 Project Specification (Planning Phase)
+- [ ] Initialize Database Schema (Execution Milestone 1)
