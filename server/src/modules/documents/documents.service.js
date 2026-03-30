@@ -221,11 +221,112 @@ const forwardDocument = async (id, workerId, { to_department_id, note }) => {
   }
 };
 
+/**
+ * Lists documents assigned to or created by a worker.
+ */
+const getMyDocuments = async (workerId) => {
+  const query = `
+    SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name
+    FROM documents d
+    JOIN users u ON d.created_by = u.id
+    JOIN departments sd ON d.sender_department_id = sd.id
+    JOIN departments rd ON d.receiver_department_id = rd.id
+    WHERE d.assigned_to = $1 OR d.created_by = $1
+    ORDER BY d.updated_at DESC
+  `;
+  const result = await db.query(query, [workerId]);
+  return result.rows;
+};
+
+/**
+ * Lists all documents system-wide (Super Admin).
+ */
+const listAllDocuments = async ({ department_id, status, assigned_to }) => {
+  let query = `
+    SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name, au.name as assignee_name
+    FROM documents d
+    JOIN users u ON d.created_by = u.id
+    JOIN departments sd ON d.sender_department_id = sd.id
+    JOIN departments rd ON d.receiver_department_id = rd.id
+    LEFT JOIN users au ON d.assigned_to = au.id
+    WHERE 1=1
+  `;
+  const params = [];
+  let counter = 1;
+
+  if (department_id) {
+    query += ` AND (d.sender_department_id = $${counter} OR d.receiver_department_id = $${counter})`;
+    params.push(department_id);
+    counter++;
+  }
+  if (status) {
+    query += ` AND d.status = $${counter++}`;
+    params.push(status);
+  }
+  if (assigned_to) {
+    query += ` AND d.assigned_to = $${counter++}`;
+    params.push(assigned_to);
+  }
+
+  query += ' ORDER BY d.created_at DESC';
+  const result = await db.query(query, params);
+  return result.rows;
+};
+
+/**
+ * Fetches full document detail including audit trail and forwarding history.
+ */
+const getDocumentDetail = async (id) => {
+  // 1. Basic Info
+  const docQuery = `
+    SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name, au.name as assignee_name
+    FROM documents d
+    JOIN users u ON d.created_by = u.id
+    JOIN departments sd ON d.sender_department_id = sd.id
+    JOIN departments rd ON d.receiver_department_id = rd.id
+    LEFT JOIN users au ON d.assigned_to = au.id
+    WHERE d.id = $1
+  `;
+  const docResult = await db.query(docQuery, [id]);
+  const document = docResult.rows[0];
+
+  if (!document) return null;
+
+  // 2. Forwarding History
+  const forwardQuery = `
+    SELECT df.*, u.name as from_user_name, fd.name as from_department_name, td.name as to_department_name
+    FROM document_forwards df
+    JOIN users u ON df.from_user_id = u.id
+    JOIN departments fd ON df.from_department_id = fd.id
+    JOIN departments td ON df.to_department_id = td.id
+    WHERE df.document_id = $1
+    ORDER BY df.forwarded_at ASC
+  `;
+  const forwardResult = await db.query(forwardQuery, [id]);
+  document.forwarding_history = forwardResult.rows;
+
+  // 3. Audit Trail
+  const auditQuery = `
+    SELECT al.*, u.name as actor_name
+    FROM audit_logs al
+    JOIN users u ON al.actor_id = u.id
+    WHERE al.entity_type = 'document' AND al.entity_id = $1
+    ORDER BY al.created_at DESC
+  `;
+  const auditResult = await db.query(auditQuery, [id]);
+  document.audit_logs = auditResult.rows;
+
+  return document;
+};
+
 module.exports = {
   createDocument,
   getInbox,
   pickupDocument,
   startProcessing,
   completeDocument,
-  forwardDocument
+  forwardDocument,
+  getMyDocuments,
+  listAllDocuments,
+  getDocumentDetail
 };

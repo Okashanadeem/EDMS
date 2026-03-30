@@ -25,18 +25,18 @@
 - [x] Document Module: Processing (Start, Complete)
 
 ### 🧩 Milestone 4: Frontend Development
-- [ ] Vite React setup with Axios interceptors
-- [ ] AuthContext and Protected Routes for role-gating
-- [ ] Super Admin Layout: Dashboard, Depts, Users, All Docs, Audit Log
-- [ ] Worker Layout: Dashboard, Inbox, My Docs, Create, Detail View
-- [ ] Document Action UI: Context-sensitive buttons per status
-- [ ] Pick-up race condition handler (409 Conflict toast)
+- [x] Vite React setup with Axios interceptors
+- [x] AuthContext and Protected Routes for role-gating
+- [x] Super Admin Layout: Dashboard, Depts, Users, All Docs, Audit Log
+- [x] Worker Layout: Dashboard, Inbox, My Docs, Create, Detail View
+- [x] Document Action UI: Context-sensitive buttons per status
+- [x] Pick-up race condition handler (409 Conflict toast)
 
 ### 🧩 Milestone 5: Audit & Validation
 - [x] Audit Logger Utility: Transactional writes
 - [x] Audit Module: View all logs (Super Admin only)
-- [ ] Document Detail: Integrated audit timeline view
-- [ ] Final end-to-end workflow validation
+- [x] Document Detail: Integrated audit timeline view
+- [x] Final end-to-end workflow validation
 
 ---
 

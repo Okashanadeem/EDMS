@@ -14,16 +14,34 @@ const upload = multer({
 });
 
 /**
- * @route POST /api/v1/documents
+ * @route GET /api/v1/documents
+ * @access super_admin
+ */
+router.get('/', authMiddleware, rbacMiddleware('super_admin'), documentController.listAllDocuments);
+
+/**
+ * @route GET /api/v1/documents/mine
  * @access worker
  */
-router.post('/', authMiddleware, rbacMiddleware('worker'), upload.single('file'), documentController.createDocument);
+router.get('/mine', authMiddleware, rbacMiddleware('worker'), documentController.getMyDocuments);
 
 /**
  * @route GET /api/v1/documents/inbox
  * @access worker
  */
 router.get('/inbox', authMiddleware, rbacMiddleware('worker'), documentController.getInbox);
+
+/**
+ * @route GET /api/v1/documents/:id
+ * @access authenticated
+ */
+router.get('/:id', authMiddleware, documentController.getDocumentDetail);
+
+/**
+ * @route POST /api/v1/documents
+ * @access worker
+ */
+router.post('/', authMiddleware, rbacMiddleware('worker'), upload.single('file'), documentController.createDocument);
 
 /**
  * @route POST /api/v1/documents/:id/pickup

@@ -32,4 +32,5 @@
 - [x] Implement Document Creation & Inbox (Milestone 3)
 - [x] Implement Document Pickup Logic (Milestone 3)
 - [x] Implement Document Forwarding & Processing (Milestone 4)
-- [ ] Initialize React Frontend (Milestone 5)
+- [x] Initialize React Frontend (Milestone 5)
+- [x] Implement All Role-Based Dashboards and Workflows (Milestone 5)

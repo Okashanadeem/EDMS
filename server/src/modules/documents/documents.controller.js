@@ -125,11 +125,68 @@ const forwardDocument = async (req, res) => {
   }
 };
 
+/**
+ * Handles fetching documents assigned to or created by a worker.
+ */
+const getMyDocuments = async (req, res) => {
+  try {
+    const data = await documentService.getMyDocuments(req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch your documents.' });
+  }
+};
+
+/**
+ * Handles system-wide document listing (Super Admin).
+ */
+const listAllDocuments = async (req, res) => {
+  const { department_id, status, assigned_to } = req.query;
+  try {
+    const data = await documentService.listAllDocuments({ department_id, status, assigned_to });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch documents.' });
+  }
+};
+
+/**
+ * Handles fetching document detail.
+ */
+const getDocumentDetail = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const data = await documentService.getDocumentDetail(id);
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Document not found.' });
+    }
+    
+    // RBAC: Super Admin can see all, Worker can see if they belong to sender/receiver dept or are assigned/creator.
+    if (req.user.role === 'worker') {
+      const isSenderDept = data.sender_department_id === req.user.department_id;
+      const isReceiverDept = data.receiver_department_id === req.user.department_id;
+      const isCreator = data.created_by === req.user.id;
+      const isAssignee = data.assigned_to === req.user.id;
+      
+      if (!isSenderDept && !isReceiverDept && !isCreator && !isAssignee) {
+        return res.status(403).json({ success: false, error: 'Not authorized to view this document.' });
+      }
+    }
+    
+    res.status(200).json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch document details.' });
+  }
+};
+
 module.exports = {
   createDocument,
   getInbox,
   pickupDocument,
   startProcessing,
   completeDocument,
-  forwardDocument
+  forwardDocument,
+  getMyDocuments,
+  listAllDocuments,
+  getDocumentDetail
 };

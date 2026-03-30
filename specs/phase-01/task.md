@@ -27,12 +27,13 @@
 16. [x] Audit Log Module: `GET /audit` (filters by entity, actor, date).
 
 ## 🧩 Milestone 5: React Frontend Development
-17. [ ] Scaffold `client/` (Vite, Axios, React Router, Tailwind/CSS).
-18. [ ] AuthContext: Persist JWT and user profile in memory and localStorage.
-19. [ ] Super Admin UI: Manage Departments and Workers (with password modal).
-20. [ ] Worker UI: Dashboard (stats), Inbox (Pick up button), Create Doc (Form), My Docs (List).
-21. [ ] Document Detail View: Full metadata, audit timeline (vertical component), action buttons.
-22. [ ] Integrate 409 Conflict handling for race condition pickups.
+17. [x] Scaffold `client/` (Vite, Axios, React Router, Tailwind/CSS).
+18. [x] AuthContext: Persist JWT and user profile in memory and localStorage.
+19. [x] Super Admin UI: Manage Departments and Workers (with password modal).
+20. [x] Worker UI: Dashboard (stats), Inbox (Pick up button), Create Doc (Form), My Docs (List).
+21. [x] Document Detail View: Full metadata, audit timeline (vertical component), action buttons.
+22. [x] Integrate 409 Conflict handling for race condition pickups.
+23. [x] Implement Super Admin and Worker layouts with role-gated navigation.
 
 ## 🏁 Phase Deliverables
 - Fully functional Node.js/PostgreSQL backend API.
