@@ -17,4 +17,6 @@
 ## 🚧 Current Work
 - [x] Establish Phase 1 Project Specification (Planning Phase)
 - [x] Push Governance & Specs to `infra/planning-governance`
-- [ ] Initialize Database Schema (Execution Milestone 1)
+- [x] Initialize Database Schema (schema.sql)
+- [x] Seed initial Super Admin user (seed.sql)
+- [ ] Create `server/package.json` and initialize backend boilerplate
