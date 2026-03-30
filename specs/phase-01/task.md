@@ -3,8 +3,8 @@
 ## 🧩 Milestone 1: Backend Setup & Foundation
 0. [x] Initialize PostgreSQL database schema (schema.sql).
 0. [x] Seed initial Super Admin user (seed.sql).
-1. [ ] Create `server/package.json` and install dependencies (Express, PG, JWT, Bcrypt, Dotenv).
-2. [ ] Write `server/src/config/db.js` for PostgreSQL connection pooling.
+1. [x] Create `server/package.json` and install dependencies (Express, PG, JWT, Bcrypt, Dotenv).
+2. [x] Write `server/src/config/db.js` for PostgreSQL connection pooling.
 3. [ ] Implement `server/src/middleware/auth.js` for JWT verification.
 4. [ ] Implement `server/src/middleware/rbac.js` for role-based gating.
 5. [ ] Define global error handlers and morgan logging in `server/src/app.js`.

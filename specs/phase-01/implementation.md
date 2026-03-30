@@ -19,4 +19,6 @@
 - [x] Push Governance & Specs to `infra/planning-governance`
 - [x] Initialize Database Schema (schema.sql)
 - [x] Seed initial Super Admin user (seed.sql)
-- [ ] Create `server/package.json` and initialize backend boilerplate
+- [x] Create `server/package.json` and initialize backend boilerplate
+- [x] Configure PostgreSQL connection pool (`db.js`)
+- [ ] Implement Authentication and RBAC middleware
