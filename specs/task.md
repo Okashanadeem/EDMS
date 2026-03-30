@@ -7,7 +7,7 @@
 - [x] Seed initial Super Admin user (seed.sql)
 - [x] Implement database connection pool (db.js)
 - [x] Configure environment variables (.env stubs)
-- [ ] Implementation of `auth` and `rbac` middlewares
+- [x] Implementation of `auth` and `rbac` middlewares
 
 ### 🧩 Milestone 2: Identity & Access Management
 - [ ] Auth Module: Login endpoint (`/auth/login`)

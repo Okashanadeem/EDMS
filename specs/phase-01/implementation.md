@@ -21,4 +21,6 @@
 - [x] Seed initial Super Admin user (seed.sql)
 - [x] Create `server/package.json` and initialize backend boilerplate
 - [x] Configure PostgreSQL connection pool (`db.js`)
-- [ ] Implement Authentication and RBAC middleware
+- [x] Implement Authentication and RBAC middleware
+- [x] Initialize `app.js` with global middleware and routing stubs
+- [ ] Implement Auth Module (Milestone 2)
