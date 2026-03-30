@@ -10,8 +10,8 @@
 - [x] Implementation of `auth` and `rbac` middlewares
 
 ### 🧩 Milestone 2: Identity & Access Management
-- [ ] Auth Module: Login endpoint (`/auth/login`)
-- [ ] Auth Module: JWT token generation and validation
+- [x] Auth Module: Login endpoint (`/auth/login`)
+- [x] Auth Module: JWT token generation and validation
 - [ ] User Module: CRUD for workers (Super Admin only)
 - [ ] User Module: Random password generation and one-time display logic
 - [ ] Department Module: CRUD for departments (Super Admin only)

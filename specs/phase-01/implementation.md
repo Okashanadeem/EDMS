@@ -23,4 +23,5 @@
 - [x] Configure PostgreSQL connection pool (`db.js`)
 - [x] Implement Authentication and RBAC middleware
 - [x] Initialize `app.js` with global middleware and routing stubs
-- [ ] Implement Auth Module (Milestone 2)
+- [x] Implement Auth Module (Milestone 2)
+- [ ] Implement Department Module (Milestone 2)
