@@ -33,8 +33,8 @@
 - [ ] Pick-up race condition handler (409 Conflict toast)
 
 ### 🧩 Milestone 5: Audit & Validation
-- [ ] Audit Logger Utility: Transactional writes
-- [ ] Audit Module: View all logs (Super Admin only)
+- [x] Audit Logger Utility: Transactional writes
+- [x] Audit Module: View all logs (Super Admin only)
 - [ ] Document Detail: Integrated audit timeline view
 - [ ] Final end-to-end workflow validation
 

@@ -13,7 +13,7 @@
 6. [x] Auth Controller: `/auth/login` (email/password check, return JWT).
 7. [x] Department Module: `GET /departments`, `POST /departments`, `PATCH /departments/:id`, `DELETE /departments/:id`.
 8. [x] User Module: `GET /users`, `POST /users` (with random password generation), `PATCH /users/:id/reset-password`.
-9. [ ] Implement `utils/auditLogger.js` to support transactional logging.
+9. [x] Implement `utils/auditLogger.js` to support transactional logging.
 
 ## 🧩 Milestone 3: Document Core Routing
 10. [ ] Numbering Utility: Atomic `generateNumber` (uses `doc_number_sequences`).
@@ -24,7 +24,7 @@
 ## 🧩 Milestone 4: Document Lifecycle & Auditing
 14. [ ] Processing Logic: `POST /documents/:id/start`, `POST /documents/:id/complete`.
 15. [ ] Forwarding Logic: `POST /documents/:id/forward` (new `document_forwards` entry, reset status, new Outward Number, transactions).
-16. [ ] Audit Log Module: `GET /audit` (filters by entity, actor, date).
+16. [x] Audit Log Module: `GET /audit` (filters by entity, actor, date).
 
 ## 🧩 Milestone 5: React Frontend Development
 17. [ ] Scaffold `client/` (Vite, Axios, React Router, Tailwind/CSS).

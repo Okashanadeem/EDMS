@@ -26,4 +26,6 @@
 - [x] Implement Auth Module (Milestone 2)
 - [x] Implement Department Module (Milestone 2)
 - [x] Implement User Module (Milestone 2)
-- [ ] Implement Audit Logger Utility (Milestone 2)
+- [x] Implement Audit Logger Utility (Milestone 2)
+- [x] Implement Audit Module (Milestone 5)
+- [ ] Implement Document Numbering Utility (Milestone 3)

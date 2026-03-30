@@ -25,7 +25,7 @@ app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
 app.use('/api/v1/departments', require('./modules/departments/departments.routes'));
 app.use('/api/v1/users', require('./modules/users/users.routes'));
 // TODO: app.use('/api/v1/documents', require('./modules/documents/documents.routes'));
-// TODO: app.use('/api/v1/audit', require('./modules/audit/audit.routes'));
+app.use('/api/v1/audit', require('./modules/audit/audit.routes'));
 
 // 404 Handler
 app.use((req, res) => {
