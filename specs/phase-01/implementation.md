@@ -31,4 +31,5 @@
 - [x] Implement Document Numbering Utility (Milestone 3)
 - [x] Implement Document Creation & Inbox (Milestone 3)
 - [x] Implement Document Pickup Logic (Milestone 3)
-- [ ] Implement Document Forwarding & Processing (Milestone 4)
+- [x] Implement Document Forwarding & Processing (Milestone 4)
+- [ ] Initialize React Frontend (Milestone 5)

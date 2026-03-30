@@ -31,4 +31,22 @@ router.get('/inbox', authMiddleware, rbacMiddleware('worker'), documentControlle
  */
 router.post('/:id/pickup', authMiddleware, rbacMiddleware('worker'), documentController.pickupDocument);
 
+/**
+ * @route POST /api/v1/documents/:id/start
+ * @access worker
+ */
+router.post('/:id/start', authMiddleware, rbacMiddleware('worker'), documentController.startProcessing);
+
+/**
+ * @route POST /api/v1/documents/:id/complete
+ * @access worker
+ */
+router.post('/:id/complete', authMiddleware, rbacMiddleware('worker'), documentController.completeDocument);
+
+/**
+ * @route POST /api/v1/documents/:id/forward
+ * @access worker
+ */
+router.post('/:id/forward', authMiddleware, rbacMiddleware('worker'), documentController.forwardDocument);
+
 module.exports = router;

@@ -22,8 +22,8 @@
 13. [x] Pickup Logic: `POST /documents/:id/pickup` (UPDATE...WHERE... check, generate Inward Number, transactions).
 
 ## 🧩 Milestone 4: Document Lifecycle & Auditing
-14. [ ] Processing Logic: `POST /documents/:id/start`, `POST /documents/:id/complete`.
-15. [ ] Forwarding Logic: `POST /documents/:id/forward` (new `document_forwards` entry, reset status, new Outward Number, transactions).
+14. [x] Processing Logic: `POST /documents/:id/start`, `POST /documents/:id/complete`.
+15. [x] Forwarding Logic: `POST /documents/:id/forward` (new `document_forwards` entry, reset status, new Outward Number, transactions).
 16. [x] Audit Log Module: `GET /audit` (filters by entity, actor, date).
 
 ## 🧩 Milestone 5: React Frontend Development

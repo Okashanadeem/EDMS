@@ -66,8 +66,70 @@ const pickupDocument = async (req, res) => {
   }
 };
 
+/**
+ * Handles marking a document as in_progress.
+ */
+const startProcessing = async (req, res) => {
+  const { id } = req.params;
+  const workerId = req.user.id;
+
+  try {
+    const data = await documentService.startProcessing(id, workerId);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error.message === 'NOT_AUTHORIZED_OR_NOT_FOUND') {
+      return res.status(403).json({ success: false, error: 'Not authorized to process this document.' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to start processing.' });
+  }
+};
+
+/**
+ * Handles marking a document as completed.
+ */
+const completeDocument = async (req, res) => {
+  const { id } = req.params;
+  const workerId = req.user.id;
+
+  try {
+    const data = await documentService.completeDocument(id, workerId);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error.message === 'NOT_AUTHORIZED_OR_NOT_FOUND') {
+      return res.status(403).json({ success: false, error: 'Not authorized to complete this document.' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to complete document.' });
+  }
+};
+
+/**
+ * Handles forwarding a document.
+ */
+const forwardDocument = async (req, res) => {
+  const { id } = req.params;
+  const { to_department_id, note } = req.body;
+  const workerId = req.user.id;
+
+  if (!to_department_id) {
+    return res.status(400).json({ success: false, error: 'Target department is required.' });
+  }
+
+  try {
+    const data = await documentService.forwardDocument(id, workerId, { to_department_id, note });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error.message === 'NOT_AUTHORIZED_OR_NOT_FOUND') {
+      return res.status(403).json({ success: false, error: 'Not authorized to forward this document.' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to forward document.' });
+  }
+};
+
 module.exports = {
   createDocument,
   getInbox,
-  pickupDocument
+  pickupDocument,
+  startProcessing,
+  completeDocument,
+  forwardDocument
 };

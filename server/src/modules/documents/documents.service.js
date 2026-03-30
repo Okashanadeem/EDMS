@@ -117,8 +117,115 @@ const pickupDocument = async (id, workerId, departmentId) => {
   }
 };
 
+/**
+ * Marks a document as in_progress.
+ */
+const startProcessing = async (id, workerId) => {
+  const query = 'UPDATE documents SET status = $1, updated_at = NOW() WHERE id = $2 AND assigned_to = $3 RETURNING *';
+  const result = await db.query(query, ['in_progress', id, workerId]);
+  
+  if (!result.rows[0]) throw new Error('NOT_AUTHORIZED_OR_NOT_FOUND');
+
+  await auditLog({
+    actorId: workerId,
+    action: 'document.started',
+    entityType: 'document',
+    entityId: id,
+    metadata: { subject: result.rows[0].subject }
+  });
+
+  return result.rows[0];
+};
+
+/**
+ * Marks a document as completed.
+ */
+const completeDocument = async (id, workerId) => {
+  const query = 'UPDATE documents SET status = $1, updated_at = NOW() WHERE id = $2 AND assigned_to = $3 RETURNING *';
+  const result = await db.query(query, ['completed', id, workerId]);
+
+  if (!result.rows[0]) throw new Error('NOT_AUTHORIZED_OR_NOT_FOUND');
+
+  await auditLog({
+    actorId: workerId,
+    action: 'document.completed',
+    entityType: 'document',
+    entityId: id,
+    metadata: { subject: result.rows[0].subject }
+  });
+
+  return result.rows[0];
+};
+
+/**
+ * Forwards a document to another department.
+ * Transactional: Reset Doc + New Outward No + Forward Record + Audit Log.
+ */
+const forwardDocument = async (id, workerId, { to_department_id, note }) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Get current document details
+    const docQuery = 'SELECT * FROM documents WHERE id = $1 AND assigned_to = $2';
+    const docResult = await client.query(docQuery, [id, workerId]);
+    const currentDoc = docResult.rows[0];
+
+    if (!currentDoc) throw new Error('NOT_AUTHORIZED_OR_NOT_FOUND');
+
+    // 2. Generate new Outward Number for the forwarding department
+    const newOutwardNumber = await generateNumber(currentDoc.receiver_department_id, 'outward', client);
+
+    // 3. Update document: reset assigned_to, set status to in_transit, update outward_number
+    const updateDocQuery = `
+      UPDATE documents
+      SET status = 'in_transit', assigned_to = NULL, picked_up_at = NULL, inward_number = NULL,
+          receiver_department_id = $1, sender_department_id = $2, outward_number = $3, updated_at = NOW()
+      WHERE id = $4
+      RETURNING *
+    `;
+    const updatedDocResult = await client.query(updateDocQuery, [
+      to_department_id, currentDoc.receiver_department_id, newOutwardNumber, id
+    ]);
+
+    // 4. Record forward history
+    const forwardQuery = `
+      INSERT INTO document_forwards (document_id, from_user_id, from_department_id, to_department_id, note, new_outward_number)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `;
+    await client.query(forwardQuery, [
+      id, workerId, currentDoc.receiver_department_id, to_department_id, note, newOutwardNumber
+    ]);
+
+    // 5. Audit Log
+    await auditLog({
+      actorId: workerId,
+      action: 'document.forwarded',
+      entityType: 'document',
+      entityId: id,
+      metadata: { 
+        from_dept_id: currentDoc.receiver_department_id, 
+        to_dept_id: to_department_id,
+        new_outward_number: newOutwardNumber
+      },
+      client
+    });
+
+    await client.query('COMMIT');
+    return updatedDocResult.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createDocument,
   getInbox,
-  pickupDocument
+  pickupDocument,
+  startProcessing,
+  completeDocument,
+  forwardDocument
 };

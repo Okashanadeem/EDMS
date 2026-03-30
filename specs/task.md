@@ -21,8 +21,8 @@
 - [x] Document Module: Create and Dispatch (`POST /documents`)
 - [x] Document Module: Department Inbox query (`GET /documents/inbox`)
 - [x] Document Module: Atomic Pickup logic (`POST /documents/:id/pickup`)
-- [ ] Document Module: Document Forwarding with new outward numbers
-- [ ] Document Module: Processing (Start, Complete)
+- [x] Document Module: Document Forwarding with new outward numbers
+- [x] Document Module: Processing (Start, Complete)
 
 ### 🧩 Milestone 4: Frontend Development
 - [ ] Vite React setup with Axios interceptors
