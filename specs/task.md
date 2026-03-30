@@ -3,8 +3,8 @@
 ## 🚀 Phase 1: MVP Implementation (Current)
 
 ### 🧩 Milestone 1: Foundation & Backend
-- [ ] Initialize PostgreSQL database schema (schema.sql)
-- [ ] Seed initial Super Admin user (seed.sql)
+- [x] Initialize PostgreSQL database schema (schema.sql)
+- [x] Seed initial Super Admin user (seed.sql)
 - [ ] Implement database connection pool (db.js)
 - [ ] Configure environment variables (.env stubs)
 - [ ] Implementation of `auth` and `rbac` middlewares
