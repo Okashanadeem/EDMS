@@ -12,8 +12,8 @@
 ### 🧩 Milestone 2: Identity & Access Management
 - [x] Auth Module: Login endpoint (`/auth/login`)
 - [x] Auth Module: JWT token generation and validation
-- [ ] User Module: CRUD for workers (Super Admin only)
-- [ ] User Module: Random password generation and one-time display logic
+- [x] User Module: CRUD for workers (Super Admin only)
+- [x] User Module: Random password generation and one-time display logic
 - [x] Department Module: CRUD for departments (Super Admin only)
 
 ### 🧩 Milestone 3: Core Document Workflow

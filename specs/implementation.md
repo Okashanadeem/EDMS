@@ -2,9 +2,9 @@
 
 ## 📊 Summary (Phase 1 MVP)
 - **Status:** Execution - Identity & Admin
-- **Total Progress:** 32%
+- **Total Progress:** 40%
 - **Milestones Completed:** 1 / 5
-- **Tasks Completed:** 8 / 25
+- **Tasks Completed:** 10 / 25
 
 ## ✅ Completed Features Log
 | Date | Feature | Phase | Milestone | Developer | Notes |
@@ -15,6 +15,19 @@
 | 2026-03-30 | Security Middleware | 1 | 1 | Senior AI Engineer | Auth (JWT) and RBAC middlewares implemented. |
 | 2026-03-30 | Auth Module (Login) | 1 | 2 | Senior AI Engineer | Login endpoint with JWT issuance and password validation. |
 | 2026-03-30 | Department Module | 1 | 2 | Senior AI Engineer | Full CRUD for departments (Super Admin only). |
+| 2026-03-30 | User Module | 1 | 2 | Senior AI Engineer | Worker CRUD with secure temporary password generation. |
+
+## 🛠️ Technical Decisions
+| Decision | Rational | Impact |
+|---|---|---|
+| **PostgreSQL Transactions** | Ensures document state changes and audit logs are atomic. | Mandatory for all document operations. |
+| **Atomic Pickup (UPDATE...WHERE)** | Prevents race conditions when multiple workers pick up the same document. | Prevents duplicate assignments. |
+| **Role-Based Middlewares** | Centralized security logic to enforce Super Admin vs Worker access. | Simplifies route definitions and security audits. |
+| **Local-to-S3 Abstraction** | Future-proofs file storage without changing service callers. | Section 5.6 and 13.1 hooks established. |
+| **Modular Folder Structure** | Separates domain logic (Auth, Docs) from core infrastructure. | Easier to scale and maintain. |
+| **Stateless JWT Auth** | Reduces server-side session overhead. | Requires secure client-side storage of tokens. |
+| **Bcrypt Hashing** | Industry-standard password security. | Protects user credentials in case of DB compromise. |
+| **Crypto-based Passwords** | Ensures strong, unpredictable temporary credentials. | Secure initial access for workers. |
 
 ## 🛠️ Technical Decisions
 | Decision | Rational | Impact |

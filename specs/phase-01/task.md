@@ -12,7 +12,7 @@
 ## 🧩 Milestone 2: Identity & Admin Modules
 6. [x] Auth Controller: `/auth/login` (email/password check, return JWT).
 7. [x] Department Module: `GET /departments`, `POST /departments`, `PATCH /departments/:id`, `DELETE /departments/:id`.
-8. [ ] User Module: `GET /users`, `POST /users` (with random password generation), `PATCH /users/:id/reset-password`.
+8. [x] User Module: `GET /users`, `POST /users` (with random password generation), `PATCH /users/:id/reset-password`.
 9. [ ] Implement `utils/auditLogger.js` to support transactional logging.
 
 ## 🧩 Milestone 3: Document Core Routing

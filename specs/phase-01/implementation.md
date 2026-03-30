@@ -25,4 +25,5 @@
 - [x] Initialize `app.js` with global middleware and routing stubs
 - [x] Implement Auth Module (Milestone 2)
 - [x] Implement Department Module (Milestone 2)
-- [ ] Implement User Module (Milestone 2)
+- [x] Implement User Module (Milestone 2)
+- [ ] Implement Audit Logger Utility (Milestone 2)
