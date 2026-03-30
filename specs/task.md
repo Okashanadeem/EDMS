@@ -14,7 +14,7 @@
 - [x] Auth Module: JWT token generation and validation
 - [ ] User Module: CRUD for workers (Super Admin only)
 - [ ] User Module: Random password generation and one-time display logic
-- [ ] Department Module: CRUD for departments (Super Admin only)
+- [x] Department Module: CRUD for departments (Super Admin only)
 
 ### 🧩 Milestone 3: Core Document Workflow
 - [ ] Numbering Utility: Inward/Outward atomic generator

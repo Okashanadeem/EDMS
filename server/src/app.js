@@ -22,7 +22,7 @@ app.get('/health', (req, res) => {
 
 // Modular Routes (Mounting points for Phase 1)
 app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
-// TODO: app.use('/api/v1/departments', require('./modules/departments/departments.routes'));
+app.use('/api/v1/departments', require('./modules/departments/departments.routes'));
 // TODO: app.use('/api/v1/users', require('./modules/users/users.routes'));
 // TODO: app.use('/api/v1/documents', require('./modules/documents/documents.routes'));
 // TODO: app.use('/api/v1/audit', require('./modules/audit/audit.routes'));

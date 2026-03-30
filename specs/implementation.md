@@ -1,10 +1,10 @@
 # EDMS Global Implementation Progress
 
 ## 📊 Summary (Phase 1 MVP)
-- **Status:** Execution - Identity & Access
-- **Total Progress:** 24%
+- **Status:** Execution - Identity & Admin
+- **Total Progress:** 32%
 - **Milestones Completed:** 1 / 5
-- **Tasks Completed:** 6 / 25
+- **Tasks Completed:** 8 / 25
 
 ## ✅ Completed Features Log
 | Date | Feature | Phase | Milestone | Developer | Notes |
@@ -14,6 +14,7 @@
 | 2026-03-30 | Backend Boilerplate | 1 | 1 | Senior AI Engineer | package.json, src structure, and db.js config. |
 | 2026-03-30 | Security Middleware | 1 | 1 | Senior AI Engineer | Auth (JWT) and RBAC middlewares implemented. |
 | 2026-03-30 | Auth Module (Login) | 1 | 2 | Senior AI Engineer | Login endpoint with JWT issuance and password validation. |
+| 2026-03-30 | Department Module | 1 | 2 | Senior AI Engineer | Full CRUD for departments (Super Admin only). |
 
 ## 🛠️ Technical Decisions
 | Decision | Rational | Impact |
