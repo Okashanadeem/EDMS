@@ -28,7 +28,7 @@ const DeptInbox = () => {
     try {
       setLoading(true);
       const response = await api.get('/documents/inbox');
-      setDocuments(response.data);
+      setDocuments(response.data.data || []);
       setError('');
     } catch (err) {
       setError('Failed to fetch inbox documents');

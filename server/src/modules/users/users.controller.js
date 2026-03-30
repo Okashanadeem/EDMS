@@ -25,7 +25,7 @@ const createUser = async (req, res) => {
 
   try {
     const data = await userService.createUser({ name, email, department_id });
-    res.status(201).json({ success: true, data });
+    res.status(201).json({ success: true, ...data });
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Email already exists.' });
@@ -67,7 +67,7 @@ const resetPassword = async (req, res) => {
     if (!data) {
       return res.status(404).json({ success: false, error: 'User not found.' });
     }
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to reset password.' });
   }

@@ -9,7 +9,7 @@ import {
   Calendar, 
   ArrowRight,
   ChevronRight,
-  History
+  History as HistoryIcon
 } from 'lucide-react';
 
 const MyDocuments = () => {
@@ -27,7 +27,7 @@ const MyDocuments = () => {
     try {
       setLoading(true);
       const response = await api.get('/documents/mine');
-      setDocuments(response.data);
+      setDocuments(response.data.data || []);
     } catch (err) {
       setError('Failed to fetch your documents');
       console.error(err);
@@ -83,7 +83,7 @@ const MyDocuments = () => {
             onClick={fetchMyDocuments}
             className="p-2 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <History size={20} className="text-gray-600" />
+            <HistoryIcon size={20} className="text-gray-600" />
           </button>
         </div>
       </div>

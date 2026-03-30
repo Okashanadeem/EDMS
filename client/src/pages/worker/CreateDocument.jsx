@@ -24,7 +24,8 @@ const CreateDocument = () => {
   const fetchDepartments = async () => {
     try {
       const response = await api.get('/departments');
-      setDepartments(response.data.filter(d => d.is_active));
+      const depts = response.data.data || [];
+      setDepartments(depts.filter(d => d.is_active));
     } catch (err) {
       console.error('Failed to fetch departments');
     }
@@ -50,8 +51,10 @@ const CreateDocument = () => {
         },
       });
 
-      // Redirect to the newly created document detail or "My Documents"
-      navigate(`/worker/document/${response.data.id}`);
+      // Redirect to the newly created document detail
+      // Backend returns { success: true, data: { id, ... } }
+      const newDocId = response.data.data.id;
+      navigate(`/worker/document/${newDocId}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create document');
     } finally {

@@ -9,7 +9,8 @@ import {
   PlusCircle, 
   ArrowRight,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  History as HistoryIcon
 } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 
@@ -35,9 +36,11 @@ const WorkerDashboard = () => {
         api.get('/documents/mine')
       ]);
 
-      const myDocs = mineRes.data;
+      const inboxData = inboxRes.data.data || [];
+      const myDocs = mineRes.data.data || [];
+      
       setStats({
-        inbox_count: inboxRes.data.length,
+        inbox_count: inboxData.length,
         active_count: myDocs.filter(d => ['picked_up', 'in_progress'].includes(d.status)).length,
         completed_count: myDocs.filter(d => d.status === 'completed').length,
         recent_docs: myDocs.slice(0, 5)
@@ -172,7 +175,7 @@ const WorkerDashboard = () => {
               If you encounter technical issues or need access to more departments, contact your Super Admin.
             </p>
             <div className="flex items-center text-xs font-bold text-indigo-600">
-              <History size={14} className="mr-2" />
+              <HistoryIcon size={14} className="mr-2" />
               View full audit trail in details
             </div>
           </div>

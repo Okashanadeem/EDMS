@@ -7,9 +7,9 @@ const router = express.Router();
 
 /**
  * @route GET /api/v1/departments
- * @access super_admin
+ * @access authenticated
  */
-router.get('/', authMiddleware, rbacMiddleware('super_admin'), departmentController.listDepartments);
+router.get('/', authMiddleware, rbacMiddleware('super_admin', 'worker'), departmentController.listDepartments);
 
 /**
  * @route POST /api/v1/departments
