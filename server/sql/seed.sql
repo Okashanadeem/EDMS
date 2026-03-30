@@ -1,10 +1,15 @@
 -- Seed initial Super Admin
--- Password: Admin@1234 (Bcrypt hash below is a placeholder; replace with actual hash in production)
+-- Password: Admin@1234
 INSERT INTO users (name, email, password_hash, role, department_id)
 VALUES (
   'System Super Admin',
   'superadmin@edms.local',
-  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- placeholder for 'Admin@1234'
+  '$2b$10$TsUmLpzdvOsxqxGNTSznxukneCnKVTARK1UfILes8ZQ5D2BwQDOVO', -- Correct hash for 'Admin@1234'
   'super_admin',
   NULL
-);
+)
+ON CONFLICT (email) DO UPDATE 
+SET password_hash = EXCLUDED.password_hash,
+    name = EXCLUDED.name,
+    role = EXCLUDED.role;
+

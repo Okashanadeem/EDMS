@@ -19,4 +19,18 @@
 - [x] Push Governance & Specs to `infra/planning-governance`
 - [x] Initialize Database Schema (schema.sql)
 - [x] Seed initial Super Admin user (seed.sql)
-- [ ] Create `server/package.json` and initialize backend boilerplate
+- [x] Create `server/package.json` and initialize backend boilerplate
+- [x] Configure PostgreSQL connection pool (`db.js`)
+- [x] Implement Authentication and RBAC middleware
+- [x] Initialize `app.js` with global middleware and routing stubs
+- [x] Implement Auth Module (Milestone 2)
+- [x] Implement Department Module (Milestone 2)
+- [x] Implement User Module (Milestone 2)
+- [x] Implement Audit Logger Utility (Milestone 2)
+- [x] Implement Audit Module (Milestone 5)
+- [x] Implement Document Numbering Utility (Milestone 3)
+- [x] Implement Document Creation & Inbox (Milestone 3)
+- [x] Implement Document Pickup Logic (Milestone 3)
+- [x] Implement Document Forwarding & Processing (Milestone 4)
+- [x] Initialize React Frontend (Milestone 5)
+- [x] Implement All Role-Based Dashboards and Workflows (Milestone 5)

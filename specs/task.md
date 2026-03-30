@@ -5,38 +5,38 @@
 ### 🧩 Milestone 1: Foundation & Backend
 - [x] Initialize PostgreSQL database schema (schema.sql)
 - [x] Seed initial Super Admin user (seed.sql)
-- [ ] Implement database connection pool (db.js)
-- [ ] Configure environment variables (.env stubs)
-- [ ] Implementation of `auth` and `rbac` middlewares
+- [x] Implement database connection pool (db.js)
+- [x] Configure environment variables (.env stubs)
+- [x] Implementation of `auth` and `rbac` middlewares
 
 ### 🧩 Milestone 2: Identity & Access Management
-- [ ] Auth Module: Login endpoint (`/auth/login`)
-- [ ] Auth Module: JWT token generation and validation
-- [ ] User Module: CRUD for workers (Super Admin only)
-- [ ] User Module: Random password generation and one-time display logic
-- [ ] Department Module: CRUD for departments (Super Admin only)
+- [x] Auth Module: Login endpoint (`/auth/login`)
+- [x] Auth Module: JWT token generation and validation
+- [x] User Module: CRUD for workers (Super Admin only)
+- [x] User Module: Random password generation and one-time display logic
+- [x] Department Module: CRUD for departments (Super Admin only)
 
 ### 🧩 Milestone 3: Core Document Workflow
-- [ ] Numbering Utility: Inward/Outward atomic generator
-- [ ] Document Module: Create and Dispatch (`POST /documents`)
-- [ ] Document Module: Department Inbox query (`GET /documents/inbox`)
-- [ ] Document Module: Atomic Pickup logic (`POST /documents/:id/pickup`)
-- [ ] Document Module: Document Forwarding with new outward numbers
-- [ ] Document Module: Processing (Start, Complete)
+- [x] Numbering Utility: Inward/Outward atomic generator
+- [x] Document Module: Create and Dispatch (`POST /documents`)
+- [x] Document Module: Department Inbox query (`GET /documents/inbox`)
+- [x] Document Module: Atomic Pickup logic (`POST /documents/:id/pickup`)
+- [x] Document Module: Document Forwarding with new outward numbers
+- [x] Document Module: Processing (Start, Complete)
 
 ### 🧩 Milestone 4: Frontend Development
-- [ ] Vite React setup with Axios interceptors
-- [ ] AuthContext and Protected Routes for role-gating
-- [ ] Super Admin Layout: Dashboard, Depts, Users, All Docs, Audit Log
-- [ ] Worker Layout: Dashboard, Inbox, My Docs, Create, Detail View
-- [ ] Document Action UI: Context-sensitive buttons per status
-- [ ] Pick-up race condition handler (409 Conflict toast)
+- [x] Vite React setup with Axios interceptors
+- [x] AuthContext and Protected Routes for role-gating
+- [x] Super Admin Layout: Dashboard, Depts, Users, All Docs, Audit Log
+- [x] Worker Layout: Dashboard, Inbox, My Docs, Create, Detail View
+- [x] Document Action UI: Context-sensitive buttons per status
+- [x] Pick-up race condition handler (409 Conflict toast)
 
 ### 🧩 Milestone 5: Audit & Validation
-- [ ] Audit Logger Utility: Transactional writes
-- [ ] Audit Module: View all logs (Super Admin only)
-- [ ] Document Detail: Integrated audit timeline view
-- [ ] Final end-to-end workflow validation
+- [x] Audit Logger Utility: Transactional writes
+- [x] Audit Module: View all logs (Super Admin only)
+- [x] Document Detail: Integrated audit timeline view
+- [x] Final end-to-end workflow validation
 
 ---
 
