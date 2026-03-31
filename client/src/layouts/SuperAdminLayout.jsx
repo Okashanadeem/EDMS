@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -9,13 +10,15 @@ import {
   History, 
   LogOut,
   Menu,
-  X
+  X,
+  ShieldCheck
 } from 'lucide-react';
 
 const SuperAdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -61,10 +64,17 @@ const SuperAdminLayout = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 space-y-2">
+          <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            className="flex items-center w-full p-2 hover:bg-slate-800 text-slate-300 rounded transition-colors text-sm"
+          >
+            <ShieldCheck size={20} />
+            {isSidebarOpen && <span className="ml-4">Security</span>}
+          </button>
           <button
             onClick={handleLogout}
-            className="flex items-center w-full p-2 hover:bg-red-900/20 text-red-400 rounded transition-colors"
+            className="flex items-center w-full p-2 hover:bg-red-900/20 text-red-400 rounded transition-colors text-sm"
           >
             <LogOut size={20} />
             {isSidebarOpen && <span className="ml-4">Logout</span>}
@@ -91,6 +101,11 @@ const SuperAdminLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+      />
     </div>
   );
 };

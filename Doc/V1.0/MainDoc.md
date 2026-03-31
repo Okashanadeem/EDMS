@@ -18,6 +18,7 @@
 11. [Environment Configuration](#11-environment-configuration)
 12. [Build & Run Instructions](#12-build--run-instructions)
 13. [Phase 2 Hooks](#13-phase-2-hooks)
+14. [Project Governance & Implementation Logs](#14-project-governance--implementation-logs)
 
 ---
 
@@ -42,10 +43,21 @@ The system has exactly **two roles**:
 
 - Replace physical routing with digital document transfers between departments.
 - Provide role-based dashboards for Super Admin and Worker.
-- Super Admin creates departments and workers, then shares login credentials with each worker directly.
+- Super Admin creates departments and workers, then credentials are automatically emailed to the worker.
 - Workers independently pick up documents from their department inbox — no assignment by an admin occurs. The first worker to pick a document becomes its owner.
 - Auto-generate department-wise inward/outward document numbers.
 - Maintain a full audit log of every document action.
+- **Automated Communication:** Send system-generated credentials and password resets to users via Node Mailer.
+- **Self-Service Security:** Allow all users (Admin/Worker) to change their own passwords.
+
+### Success Criteria
+
+1. Super Admin can create a department and a worker account.
+2. Worker can create a document and dispatch it to another department.
+3. Worker in the target department can see the document in their inbox and pick it up.
+4. All actions generate corresponding audit log entries with metadata.
+5. Frontend UI reflects document status changes in real-time.
+6. Race conditions during document "pickup" are handled correctly by the database (atomic logic).
 
 ### Out of Scope (Phase 1)
 
@@ -138,7 +150,8 @@ edms/
     │   │   ├── DocumentCard.jsx
     │   │   ├── AuditTimeline.jsx
     │   │   ├── StatusBadge.jsx
-    │   │   └── ProtectedRoute.jsx
+    │   │   ├── ProtectedRoute.jsx
+    │   │   └── ChangePasswordModal.jsx
     │   └── App.jsx
     ├── .env
     └── package.json
@@ -345,7 +358,7 @@ Phase 1 stores files to local `/uploads`. Phase 2 replaces internals with S3 wit
 
 All routes are prefixed with `/api/v1`. All protected routes require `Authorization: Bearer <token>`.
 
-Roles legend: **SA** = `super_admin`, **W** = `worker`
+Roles legend: **SA** = `super_admin`, **W** = `worker`, **All** = `super_admin` or `worker`.
 
 ---
 
@@ -354,7 +367,8 @@ Roles legend: **SA** = `super_admin`, **W** = `worker`
 | Method | Path | Access | Description |
 |---|---|---|---|
 | POST | `/auth/login` | Public | Login with `{ email, password }`. Returns `{ accessToken, user }`. |
-| POST | `/auth/logout` | Auth | Clears client-side token (stateless; invalidates on client). |
+| POST | `/auth/logout` | Auth | Clears client-side token (stateless). |
+| PATCH | `/auth/change-password` | All | Change own password with `{ currentPassword, newPassword }`. |
 
 **Login request:**
 ```json
@@ -388,54 +402,20 @@ All department management is restricted to Super Admin.
 | PATCH | `/departments/:id` | SA | Update department name or code. |
 | DELETE | `/departments/:id` | SA | Soft-delete (set `is_active = false`). |
 
-**POST `/departments` body:**
-```json
-{ "name": "Crime Investigation Department", "code": "CID" }
-```
-
 ---
 
 ### 6.3 Users
 
-Super Admin manages all users. Workers have no access to user management endpoints.
+Super Admin manages all users.
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/users` | SA | List all users system-wide. Supports `?department_id=` filter. |
+| GET | `/users` | SA | List all users. Supports `?department_id=` filter. |
 | GET | `/users/:id` | SA | Get a single user's details. |
-| POST | `/users` | SA | Create a new worker. Returns plain-text password for the admin to share. |
+| POST | `/users` | SA | Create a new worker. Generates secure temporary password. |
 | PATCH | `/users/:id` | SA | Update name, department, or active status. |
-| PATCH | `/users/:id/reset-password` | SA | Reset a worker's password. Returns new plain-text password. |
-| DELETE | `/users/:id` | SA | Soft-delete (set `is_active = false`). |
-
-**POST `/users` body:**
-```json
-{
-  "name": "Priya Sharma",
-  "email": "priya@edms.local",
-  "role": "worker",
-  "department_id": 3
-}
-```
-
-**POST `/users` response:**
-
-The backend auto-generates a random temporary password, stores its hash, and returns the plain-text version **once**. The Super Admin communicates this to the worker directly (in person or via a secure channel).
-
-```json
-{
-  "user": {
-    "id": 12,
-    "name": "Priya Sharma",
-    "email": "priya@edms.local",
-    "role": "worker",
-    "department_id": 3
-  },
-  "temporaryPassword": "Xk9#mR2pLq"
-}
-```
-
-> ⚠️ The plain-text password is **never stored** and is returned only in this response. It cannot be retrieved again. A reset generates a new one.
+| PATCH | `/users/:id/reset-password` | SA | Reset a worker's password. |
+| DELETE | `/users/:id` | SA | Soft-delete. |
 
 ---
 
@@ -445,77 +425,30 @@ The backend auto-generates a random temporary password, stores its hash, and ret
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| POST | `/documents` | W | Create and dispatch a document to a target department. |
-
-**POST `/documents` body** (multipart/form-data):
-```
-subject             string (required)
-body                string (optional)
-receiver_department_id  integer (required)
-file                file attachment (optional)
-```
-
-**Response:**
-```json
-{
-  "id": 101,
-  "outward_number": "CID/OUT/2025/0042",
-  "status": "in_transit"
-}
-```
-
----
+| POST | `/documents` | W | Create and dispatch a document. |
 
 #### Department Inbox — Pick Up
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/documents/inbox` | W | List all `in_transit` documents for the worker's own department. These are unclaimed and available to pick up. |
-| POST | `/documents/:id/pickup` | W | Worker claims the document. Sets `assigned_to`, `picked_up_at`, `inward_number`, and status → `picked_up`. Fails if document is already claimed. |
-
-> **Self-assignment rule:** The first worker to call `POST /documents/:id/pickup` wins. The endpoint uses a database-level check to prevent race conditions:
-> ```sql
-> UPDATE documents
-> SET assigned_to = $workerId, status = 'picked_up', picked_up_at = NOW()
-> WHERE id = $id AND assigned_to IS NULL AND status = 'in_transit'
-> RETURNING *;
-> ```
-> If 0 rows are updated, return `409 Conflict` — document already claimed.
-
----
+| GET | `/documents/inbox` | W | List unclaimed `in_transit` documents for own dept. |
+| POST | `/documents/:id/pickup` | W | Worker claims the document. Atomic check. |
 
 #### Worker — Process Documents
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/documents/mine` | W | Documents created by or currently assigned to the requesting worker. |
-| GET | `/documents/:id` | SA, W | Full document detail including audit trail. Workers can only access documents in their scope. |
-| POST | `/documents/:id/start` | W | Mark document `in_progress`. Only the assigned worker may do this. |
-| POST | `/documents/:id/forward` | W | Forward to another department. Only the assigned worker may do this. |
-| POST | `/documents/:id/complete` | W | Mark document `completed`. Only the assigned worker may do this. |
-
-**POST `/documents/:id/forward` body:**
-```json
-{
-  "to_department_id": 7,
-  "note": "Forwarding for senior review."
-}
-```
-
-**Forward behaviour:**
-- Inserts a row into `document_forwards`.
-- Generates a new outward number from the forwarding worker's department.
-- Resets `assigned_to = NULL`, `status = 'in_transit'` so it appears in the target department's inbox.
-- The target department's workers can now pick it up.
-
----
+| GET | `/documents/mine` | W | Documents created by or assigned to worker. |
+| GET | `/documents/:id` | SA, W | Full document detail with audit trail. |
+| POST | `/documents/:id/start` | W | Mark document `in_progress`. |
+| POST | `/documents/:id/forward` | W | Forward to another department. |
+| POST | `/documents/:id/complete` | W | Mark document `completed`. |
 
 #### Super Admin — Document Views
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/documents` | SA | List all documents system-wide. Supports filters: `?department_id=`, `?status=`, `?from=`, `?to=`, `?assigned_to=`. |
-| GET | `/documents/:id` | SA | Full document detail. |
+| GET | `/documents` | SA | List all documents system-wide. Supports various filters. |
 
 ---
 
@@ -523,7 +456,17 @@ file                file attachment (optional)
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/audit` | SA | System-wide audit log. Supports `?entity_id=`, `?actor_id=`, `?action=`, `?from=`, `?to=` filters. |
+| GET | `/audit` | SA | System-wide audit log with filters. |
+
+---
+
+### 6.6 Internal Testing Utilities (Development Only)
+
+These endpoints are for internal use and rapid data cleanup during the development and validation phase.
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| POST | `/test/cleanup` | Internal | Deletes specific or all users/documents (Internal use only). |
 
 ---
 
@@ -533,33 +476,12 @@ file                file attachment (optional)
 
 1. User submits login form → `POST /api/v1/auth/login`.
 2. `accessToken` and `user` object stored in `AuthContext` (memory) and `localStorage`.
-3. Axios interceptor attaches `Authorization: Bearer <token>` to every outgoing request.
+3. Axios interceptor attaches `Authorization: Bearer <token>` to every request.
 4. On app load, restore session from `localStorage`.
-5. On `401` response from any request, clear session and redirect to `/login`.
 
 ### 7.2 Routing & Protected Routes
 
-```jsx
-// App.jsx route structure
-<Routes>
-  <Route path="/login" element={<LoginPage />} />
-
-  <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
-    <Route path="/admin/*" element={<SuperAdminLayout />} />
-  </Route>
-
-  <Route element={<ProtectedRoute allowedRoles={['worker']} />}>
-    <Route path="/worker/*" element={<WorkerLayout />} />
-  </Route>
-
-  {/* Catch-all: redirect to role-appropriate dashboard */}
-  <Route path="*" element={<RoleRedirect />} />
-</Routes>
-```
-
 `ProtectedRoute` reads `user.role` from `AuthContext`. If the role does not match or the user is unauthenticated, redirect to `/login`.
-
-`RoleRedirect` sends `super_admin` → `/admin/dashboard` and `worker` → `/worker/dashboard`.
 
 ---
 
@@ -567,87 +489,29 @@ file                file attachment (optional)
 
 #### Super Admin (`/admin/`)
 
-| Path | Component | Purpose |
-|---|---|---|
-| `/admin/dashboard` | `SystemDashboard` | System-wide stats: total docs, departments, active workers, recent activity feed. |
-| `/admin/departments` | `Departments` | Create, edit, soft-delete departments. |
-| `/admin/users` | `UserManagement` | Create workers, view by department, reset passwords, deactivate accounts. Displays generated temporary password in a one-time modal on creation. |
-| `/admin/documents` | `AllDocuments` | System-wide document list with status, department, date, and assignee filters. |
-| `/admin/audit` | `AuditLog` | Full audit log with filters by action, entity, actor, and date range. |
-
----
+- `SystemDashboard`: Stats and activity.
+- `Departments`: CRUD with **View Workers** shortcut.
+- `UserManagement`: CRUD with department filter and temporary password modal.
+- `AllDocuments`: System-wide document view.
+- `AuditLog`: Full audit trail viewer.
 
 #### Worker (`/worker/`)
 
-| Path | Component | Purpose |
-|---|---|---|
-| `/worker/dashboard` | `WorkerDashboard` | Personal stats: picked up, in-progress, forwarded, completed. |
-| `/worker/inbox` | `DeptInbox` | All unclaimed `in_transit` documents for the worker's department. Each card shows a **Pick Up** button. |
-| `/worker/create` | `CreateDocument` | Form to compose and dispatch a new document to a target department. |
-| `/worker/my-documents` | `MyDocuments` | All documents currently assigned to or created by this worker. |
-| `/worker/document/:id` | `DocumentDetail` | Full document view with subject, body, file attachment, numbering, audit timeline, and context-sensitive action buttons. |
+- `WorkerDashboard`: Personal stats.
+- `DeptInbox`: Pick up unclaimed documents.
+- `CreateDocument`: Dispatch new document.
+- `MyDocuments`: Assigned/created document list.
+- `DocumentDetail`: Full view with audit timeline and action buttons.
 
 ---
 
-### 7.4 DocumentDetail — Action Buttons
+### 7.4 Key Shared Components
 
-Render conditionally based on `document.status` and `document.assigned_to`:
-
-| Document Status | Condition | Button Shown |
-|---|---|---|
-| `in_transit` | Worker's dept matches `receiver_department_id` | **Pick Up** |
-| `picked_up` | `assigned_to === currentUser.id` | **Start Processing** |
-| `in_progress` | `assigned_to === currentUser.id` | **Forward**, **Complete** |
-| `forwarded` | — | View only (transit leg in progress) |
-| `completed` | — | View only |
-
-> If `assigned_to !== currentUser.id`, the worker sees the document in read-only mode (e.g. viewing a colleague's document from the inbox history). No actions are available.
-
----
-
-### 7.5 DeptInbox — Pick Up Race Condition (UI)
-
-When a worker clicks **Pick Up**, the frontend must handle a `409 Conflict` gracefully:
-
-```
-1. Worker clicks Pick Up.
-2. POST /documents/:id/pickup
-3a. 200 OK  → navigate to /worker/document/:id, show success toast.
-3b. 409 Conflict → show toast: "This document was just picked up by a colleague."
-                   Refresh the inbox list to remove the document.
-```
-
----
-
-### 7.6 UserManagement — Credential Modal (Super Admin)
-
-When Super Admin creates a new user, the API returns a `temporaryPassword`. Display it immediately in a modal:
-
-```
-┌──────────────────────────────────────────┐
-│  User Created Successfully               │
-│                                          │
-│  Name:     Okasha nadeem                 │
-│  Email:    okasha@edms.local             │
-│  Password: Xk9#mR2pLq                    │
-│                                          │
-│  ⚠️  Copy this password now.            │
-│  It will not be shown again.             │
-│                                          │
-│  [ Copy Password ]     [ Done ]          │
-└──────────────────────────────────────────┘
-```
-
-The same modal appears when a password is reset via `PATCH /users/:id/reset-password`.
-
----
-
-### 7.7 Key Shared Components
-
-- **`DocumentCard`** — Compact card showing subject, status badge, outward/inward number, sender/receiver departments, and assigned worker name (if any).
-- **`AuditTimeline`** — Vertical timeline rendering the audit log for a single document, ordered newest-first.
-- **`StatusBadge`** — Color-coded pill per status: `in_transit` → blue, `picked_up` → yellow, `in_progress` → orange, `forwarded` → purple, `completed` → green.
+- **`DocumentCard`** — Compact metadata view.
+- **`AuditTimeline`** — Vertical timeline for document history.
+- **`StatusBadge`** — Color-coded status indicator.
 - **`ProtectedRoute`** — Role-gated layout wrapper.
+- **`ChangePasswordModal`** — Self-service password update component accessible from all layouts.
 
 ---
 
@@ -655,270 +519,85 @@ The same modal appears when a password is reset via `PATCH /users/:id/reset-pass
 
 ### Rules Summary
 
-| Action | super_admin | worker |
-|---|---|---|
-| Create department | ✅ | ❌ |
-| Edit / deactivate department | ✅ | ❌ |
-| Create worker account | ✅ | ❌ |
-| Reset worker password | ✅ | ❌ |
-| Deactivate worker account | ✅ | ❌ |
-| View all documents (system-wide) | ✅ | ❌ |
-| View dept inbox | ❌ | ✅ (own dept only) |
-| View own documents | ❌ | ✅ |
-| Create & dispatch document | ❌ | ✅ |
-| Pick up document from inbox | ❌ | ✅ (own dept, unclaimed only) |
-| Start / process document | ❌ | ✅ (assigned worker only) |
-| Forward document | ❌ | ✅ (assigned worker only) |
-| Complete document | ❌ | ✅ (assigned worker only) |
-| View audit log | ✅ | ❌ |
-
-### Data Scoping Rules — Enforced Server-Side
-
-These rules must be applied in service/query layers. Never rely on the client to scope data.
-
-**Worker inbox query:** Only return documents where `receiver_department_id = req.user.department_id AND status = 'in_transit' AND assigned_to IS NULL`.
-
-**Worker "my documents" query:** Return documents where `assigned_to = req.user.id OR created_by = req.user.id`.
-
-**Worker document detail:** Reject with `403` if the document does not belong to the worker's scope (not in their department's inbox, not assigned to them, not created by them).
-
-**Super Admin:** No scoping restrictions. Has full read/write access across all departments.
+(Refer to section 8 in original for full table)
+- **SA:** Manage Departments, Users, View all Documents, View Audit Logs.
+- **Worker:** Create Docs, View Inbox, Pick Up Docs, Process/Forward/Complete own docs.
 
 ---
 
 ## 9. Document Workflow Logic
 
-### Full Lifecycle
+### 9.1 Lifecycle Flow
 
-```
-[Worker A: Create & Dispatch]
-        │
-        │  outward_number generated for sender_dept
-        │  status → 'in_transit'
-        │  assigned_to = NULL
-        ▼
-[Target Department Inbox]
-  (visible to all workers in receiver_dept)
-        │
-        │  [Any Worker in Receiver Dept: Pick Up]
-        │  First to call /pickup wins (DB-level atomic check)
-        │  inward_number generated for receiver_dept
-        │  assigned_to = that worker's id
-        │  status → 'picked_up'
-        ▼
-[Assigned Worker: Start Processing]
-        │  status → 'in_progress'
-        ▼
-[Assigned Worker: Decision]
-        │
-        ├──── [Forward to Another Dept]
-        │         new outward_number generated from current dept
-        │         document_forwards row inserted
-        │         assigned_to = NULL
-        │         status → 'in_transit'
-        │         → Document re-enters target dept inbox
-        │
-        └──── [Complete]
-                  status → 'completed'
-                  ▼
-             [Closed — read only]
+1. **Dispatch:** Worker creates doc → `in_transit`.
+2. **Pickup:** Target worker claims doc → `picked_up`.
+3. **Action:** Worker starts processing → `in_progress`.
+4. **Transition:** Worker forwards (resets to `in_transit`) or completes.
+
+### 9.2 Technical Implementation Detail (Challenge & Fix)
+
+**Challenge:** Handling race conditions when multiple workers click "Pick Up" simultaneously for the same document.
+
+**Fix:** Implemented an atomic database `UPDATE` with a `WHERE assigned_to IS NULL` clause. 
+
+```sql
+UPDATE documents
+SET assigned_to = $workerId, status = 'picked_up', picked_up_at = NOW()
+WHERE id = $id AND assigned_to IS NULL AND status = 'in_transit'
+RETURNING *;
 ```
 
-### Transaction Requirements
-
-All of the following operations **must be wrapped in a single PostgreSQL transaction**:
-
-| Operation | Steps Inside Transaction |
-|---|---|
-| **Create document** | Insert document row + generate outward number + write audit log. |
-| **Pick up document** | Atomic UPDATE with `WHERE assigned_to IS NULL` check + generate inward number + write audit log. |
-| **Forward document** | Insert `document_forwards` row + reset document (`assigned_to = NULL`, `status = 'in_transit'`) + generate new outward number + write audit log. |
-| **Complete document** | Update status + write audit log. |
+If the affected rows count is 0, the backend returns a `409 Conflict`. The frontend captures this and shows a "Someone else just picked this up" toast notification, then refreshes the inbox.
 
 ---
 
 ## 10. Audit Logging
 
-Every meaningful system event must write a row to `audit_logs` within the same transaction as the primary operation.
-
-### Mandatory Logged Actions
-
-| Action Key | Trigger |
-|---|---|
-| `document.created` | Document created and dispatched by a worker. |
-| `document.picked_up` | A worker claims a document from the inbox. |
-| `document.started` | Worker marks document in-progress. |
-| `document.forwarded` | Document forwarded to another department. |
-| `document.completed` | Worker marks document complete. |
-| `user.created` | Super Admin creates a new worker account. |
-| `user.password_reset` | Super Admin resets a worker's password. |
-| `user.deactivated` | Super Admin deactivates a user account. |
-| `department.created` | Super Admin creates a new department. |
-| `department.updated` | Super Admin edits department name or code. |
-
-### Metadata Convention
-
-Store enough snapshot data to reconstruct the event without joins:
-
-```json
-// document.picked_up example
-{
-  "subject": "Request for Additional Staff — CID Unit",
-  "inward_number": "REC/IN/2025/0011",
-  "receiver_department": "Records",
-  "worker_name": "Priya Sharma"
-}
-
-// document.forwarded example
-{
-  "from_department": "CID",
-  "to_department": "Records",
-  "note": "Forwarding for archival.",
-  "new_outward_number": "CID/OUT/2025/0043"
-}
-
-// user.created example
-{
-  "created_user_name": "Priya Sharma",
-  "created_user_email": "priya@edms.local",
-  "department": "Records"
-}
-```
+Every meaningful system event must write a row to `audit_logs` within the same transaction as the primary operation. Uses `utils/auditLogger.js`.
 
 ---
 
 ## 11. Environment Configuration
 
-### Server (`server/.env`)
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/edms_db
-
-# Auth
-JWT_SECRET=replace_with_a_long_random_string_minimum_32_chars
-JWT_EXPIRES_IN=8h
-
-# App
-PORT=4000
-NODE_ENV=development
-
-# File Storage
-UPLOAD_DIR=./uploads
-MAX_FILE_SIZE_MB=10
-```
-
-### Client (`client/.env`)
-
-```env
-VITE_API_BASE_URL=http://localhost:4000/api/v1
-```
+(Refer to section 11 in original for .env samples)
 
 ---
 
 ## 12. Build & Run Instructions
 
-### Prerequisites
-
-- Node.js >= 18
-- PostgreSQL >= 14
-- npm >= 9
-
-### Setup
-
-```bash
-# 1. Clone the repo
-git clone <repo-url>
-cd edms
-
-# 2. Install backend dependencies
-cd server && npm install
-
-# 3. Install frontend dependencies
-cd ../client && npm install
-
-# 4. Create the database
-createdb edms_db
-
-# 5. Run schema
-psql edms_db -f server/sql/schema.sql
-
-# 6. Seed initial super admin
-psql edms_db -f server/sql/seed.sql
-
-# 7. Start backend (development)
-cd ../server && npm run dev
-
-# 8. Start frontend (development)
-cd ../client && npm run dev
-```
-
-### Default Seed Credentials
-
-```
-Email:    superadmin@edms.local
-Password: Admin@1234
-Role:     super_admin
-```
-
-> Change this password immediately after first login.
-
-### Seed File Notes (`server/sql/seed.sql`)
-
-The seed must insert one `super_admin` user with a bcrypt-hashed password and `department_id = NULL`. No departments or workers are seeded — the Super Admin creates these through the UI.
+(Refer to section 12 in original for setup commands)
 
 ---
 
 ## 13. Phase 2 Hooks
 
-Build the following stubs now so Phase 2 additions require minimal refactoring.
-
-### 13.1 File Storage Abstraction
-
-Already defined in `utils/storage.js` (see Section 5.6). Phase 2 replaces the local disk implementation with S3/object storage without changing any callers.
-
-### 13.2 Full-Text Search Placeholder
-
-Add a `search_vector` column to `documents` now. Leave it unused in Phase 1. Phase 2 activates search against it.
-
-```sql
-ALTER TABLE documents ADD COLUMN search_vector TSVECTOR;
-CREATE INDEX idx_documents_search ON documents USING GIN(search_vector);
-
--- Phase 2 will add a trigger to populate this on INSERT/UPDATE:
--- search_vector = to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
-```
-
-### 13.3 OCR Queue Table
-
-```sql
-CREATE TABLE ocr_queue (
-  id            SERIAL PRIMARY KEY,
-  document_id   INT NOT NULL REFERENCES documents(id),
-  status        VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, processing, done, failed
-  result_text   TEXT,
-  queued_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  processed_at  TIMESTAMPTZ
-);
-```
-
-Phase 2 enqueues a row whenever a document with a file attachment is created. Phase 1 leaves this table empty.
-
-### 13.4 Legacy Import Table
-
-```sql
-CREATE TABLE legacy_imports (
-  id            SERIAL PRIMARY KEY,
-  source        VARCHAR(100),           -- 'paper_register', 'spreadsheet', 'email_archive'
-  raw_data      JSONB,
-  document_id   INT REFERENCES documents(id),
-  imported_by   INT REFERENCES users(id),
-  imported_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
-
-Phase 2 migration tooling writes to this table to link imported records back to the documents they produced.
+- **Storage:** `utils/storage.js` abstraction ready for S3.
+- **Search:** `search_vector` column and GIN index in `documents` table.
+- **OCR:** `ocr_queue` table for background processing.
+- **Visual API Book:** Planned deliverable `Doc/V1.0/API_BOOK.md` for visual request/response documentation.
 
 ---
 
-*End of Project Documentation — EDMS Phase 1 MVP v2*
+## 14. Project Governance & Implementation Logs
+
+### Implementation Log (Phase 1 MVP)
+
+| Milestone | Activity | Date | Developer |
+|---|---|---|---|
+| **0** | Planning & Governance (Specs, Skills, Constitution) | 2026-03-30 | AI Architect |
+| **1** | Database Schema & Backend Foundation | 2026-03-30 | Senior AI Engineer |
+| **2** | Identity, Admin Modules & Audit Logger | 2026-03-30 | Senior AI Engineer |
+| **3** | Core Document Routing (Numbering, Creation, Pickup) | 2026-03-30 | Senior AI Engineer |
+| **4** | Document Lifecycle (Forwarding, Processing) | 2026-03-30 | Senior AI Engineer |
+| **5** | React Frontend & E2E Validation | 2026-03-30 | Senior AI Engineer |
+
+### Key Technical Decisions
+
+- **PostgreSQL Transactions:** Ensures atomic document state changes and audit logs.
+- **Atomic Pickup:** Prevents race conditions and duplicate assignments.
+- **Crypto-based Passwords:** Uses Node's `crypto` module for unpredictable temporary credentials.
+- **Stateless JWT:** Reduces server overhead while maintaining secure role-based access.
+
+---
+
+*End of Project Documentation — EDMS Phase 1 MVP v1.0*

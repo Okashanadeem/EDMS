@@ -1,4 +1,4 @@
--- EDMS Phase 1 MVP Schema
+-- EDMS Phase 1.1 Schema
 
 -- 1. Departments
 CREATE TABLE departments (
@@ -10,7 +10,7 @@ CREATE TABLE departments (
 );
 
 -- 2. Users
-CREATE TYPE user_role AS ENUM ('super_admin', 'worker');
+CREATE TYPE user_role AS ENUM ('super_admin', 'worker', 'officer', 'assistant');
 
 CREATE TABLE users (
   id              SERIAL PRIMARY KEY,
@@ -19,15 +19,20 @@ CREATE TABLE users (
   password_hash   TEXT          NOT NULL,
   role            user_role     NOT NULL,
   department_id   INT           REFERENCES departments(id) ON DELETE SET NULL,
+  officer_id      INT           REFERENCES users(id) ON DELETE SET NULL, -- NEW
+  can_send_on_behalf BOOLEAN    NOT NULL DEFAULT FALSE,                  -- NEW
   is_active       BOOLEAN       NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
   CONSTRAINT worker_must_have_department
-    CHECK (role = 'super_admin' OR department_id IS NOT NULL)
+    CHECK (role = 'super_admin' OR department_id IS NOT NULL),
+  CONSTRAINT assistant_must_have_officer
+    CHECK (role != 'assistant' OR officer_id IS NOT NULL)
 );
 
 -- 3. Documents
 CREATE TYPE doc_status AS ENUM (
+  'draft',         -- NEW
   'in_transit',    -- Dispatched by sender; sitting in target dept inbox
   'picked_up',     -- A worker has claimed the document from the inbox
   'in_progress',   -- Worker is actively processing
@@ -38,10 +43,11 @@ CREATE TYPE doc_status AS ENUM (
 CREATE TABLE documents (
   id                      SERIAL PRIMARY KEY,
   subject                 VARCHAR(500)  NOT NULL,
-  body                    TEXT,
+  body_html               TEXT,                          -- NEW
+  body                    TEXT,                          -- Legacy plain text
   file_path               TEXT,                          -- Uploaded attachment path
 
-  status                  doc_status    NOT NULL DEFAULT 'in_transit',
+  status                  doc_status    NOT NULL DEFAULT 'draft',
 
   -- Parties
   created_by              INT           NOT NULL REFERENCES users(id),
@@ -51,6 +57,20 @@ CREATE TABLE documents (
   -- Self-assignment: set when a worker picks up the document
   assigned_to             INT           REFERENCES users(id),
   picked_up_at            TIMESTAMPTZ,
+
+  -- On-behalf-of (NEW)
+  behalf_of_officer_id    INT           REFERENCES users(id),
+  behalf_approved         BOOLEAN       NOT NULL DEFAULT FALSE,
+  behalf_otp_used         BOOLEAN       NOT NULL DEFAULT FALSE,
+
+  -- Draft review (NEW)
+  draft_revision_note     TEXT,
+  draft_submitted_by      INT           REFERENCES users(id),
+  draft_submitted_at      TIMESTAMPTZ,
+
+  -- Access restriction (NEW)
+  is_restricted           BOOLEAN       NOT NULL DEFAULT FALSE,
+  restricted_to_user_id   INT           REFERENCES users(id),
 
   -- Numbering
   outward_number          VARCHAR(100),                  -- Generated on creation
@@ -70,7 +90,42 @@ CREATE TABLE doc_number_sequences (
   UNIQUE (department_id, direction, year)
 );
 
--- 5. Document Forwarding History
+-- 5. Document Recipients — CC / BCC (NEW)
+CREATE TYPE recipient_type AS ENUM ('cc', 'bcc');
+
+CREATE TABLE document_recipients (
+  id                    SERIAL PRIMARY KEY,
+  document_id           INT             NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  department_id         INT             NOT NULL REFERENCES departments(id),
+  recipient_type        recipient_type  NOT NULL,
+  inward_number         VARCHAR(100),
+  created_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  UNIQUE (document_id, department_id, recipient_type)
+);
+
+-- 6. Document References (NEW)
+CREATE TABLE document_references (
+  id              SERIAL PRIMARY KEY,
+  document_id     INT  NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  reference_id    INT  NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (document_id, reference_id),
+  CHECK (document_id != reference_id)
+);
+
+-- 7. OTP Store (NEW)
+CREATE TABLE document_otps (
+  id              SERIAL PRIMARY KEY,
+  document_id     INT          NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  officer_id      INT          NOT NULL REFERENCES users(id),
+  assistant_id    INT          NOT NULL REFERENCES users(id),
+  otp_hash        TEXT         NOT NULL,
+  expires_at      TIMESTAMPTZ  NOT NULL,
+  used            BOOLEAN      NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- 8. Document Forwarding History
 CREATE TABLE document_forwards (
   id                    SERIAL PRIMARY KEY,
   document_id           INT           NOT NULL REFERENCES documents(id),
@@ -82,14 +137,14 @@ CREATE TABLE document_forwards (
   forwarded_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- 6. Audit Logs
+-- 9. Audit Logs
 CREATE TABLE audit_logs (
   id            SERIAL PRIMARY KEY,
   actor_id      INT          NOT NULL REFERENCES users(id),
-  action        VARCHAR(100) NOT NULL,    -- e.g. 'document.created', 'document.picked_up'
-  entity_type   VARCHAR(50)  NOT NULL,    -- e.g. 'document', 'user', 'department'
+  action        VARCHAR(100) NOT NULL,
+  entity_type   VARCHAR(50)  NOT NULL,
   entity_id     INT,
-  metadata      JSONB,                    -- Contextual snapshot
+  metadata      JSONB,
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

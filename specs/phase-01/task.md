@@ -34,6 +34,12 @@
 21. [x] Document Detail View: Full metadata, audit timeline (vertical component), action buttons.
 22. [x] Integrate 409 Conflict handling for race condition pickups.
 23. [x] Implement Super Admin and Worker layouts with role-gated navigation.
+24. [x] UI Enhancement: Add "View Workers" action in Department list (redirects to Users page with filter).
+25. [x] UI Enhancement: Implement department dropdown filter on User Management page.
+26. [x] Visual API Book: Create `Doc/V1.0/API_BOOK.md` with visual request/reponse examples.
+27. [x] Testing Utility: Implement `POST /api/v1/test/cleanup` to delete specific or all users/documents (Internal use only).
+28. [x] Self-Service: Implement `PATCH /auth/change-password` backend logic.
+29. [x] UI Enhancement: Add "Change Password" modal accessible from all layouts.
 
 ## 🏁 Phase Deliverables
 - Fully functional Node.js/PostgreSQL backend API.

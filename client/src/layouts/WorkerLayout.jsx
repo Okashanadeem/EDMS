@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -8,13 +9,15 @@ import {
   FileText, 
   LogOut,
   Menu,
-  X
+  X,
+  ShieldCheck
 } from 'lucide-react';
 
 const WorkerLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -23,7 +26,8 @@ const WorkerLayout = () => {
 
   const navItems = [
     { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/worker/dashboard' },
-    { label: 'Create Document', icon: <PlusCircle size={20} />, path: '/worker/create' },
+    { label: 'Compose', icon: <PlusCircle size={20} />, path: '/worker/compose' },
+    { label: 'Drafts', icon: <FileText size={20} />, path: '/worker/drafts' },
     { label: 'Department Inbox', icon: <Inbox size={20} />, path: '/worker/inbox' },
     { label: 'My Documents', icon: <FileText size={20} />, path: '/worker/my-documents' },
   ];
@@ -59,16 +63,23 @@ const WorkerLayout = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-indigo-800 text-xs">
+        <div className="p-4 border-t border-indigo-800 space-y-2">
           {isSidebarOpen && (
-            <div className="mb-4 text-indigo-300">
+            <div className="mb-4 text-indigo-300 px-2 text-xs">
               <p className="font-semibold uppercase tracking-wider">Department</p>
               <p className="text-sm mt-1">{user?.department_name || 'Assigned Dept'}</p>
             </div>
           )}
           <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            className="flex items-center w-full p-2 hover:bg-indigo-800 text-indigo-300 rounded transition-colors text-sm"
+          >
+            <ShieldCheck size={20} />
+            {isSidebarOpen && <span className="ml-4">Security</span>}
+          </button>
+          <button
             onClick={handleLogout}
-            className="flex items-center w-full p-2 hover:bg-red-900/20 text-red-400 rounded transition-colors"
+            className="flex items-center w-full p-2 hover:bg-red-900/20 text-red-400 rounded transition-colors text-sm"
           >
             <LogOut size={20} />
             {isSidebarOpen && <span className="ml-4">Logout</span>}
@@ -95,6 +106,11 @@ const WorkerLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+      />
     </div>
   );
 };

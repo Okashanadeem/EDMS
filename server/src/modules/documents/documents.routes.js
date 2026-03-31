@@ -15,21 +15,21 @@ const upload = multer({
 
 /**
  * @route GET /api/v1/documents
- * @access super_admin
+ * @access authenticated
  */
-router.get('/', authMiddleware, rbacMiddleware('super_admin'), documentController.listAllDocuments);
+router.get('/', authMiddleware, rbacMiddleware('super_admin', 'worker', 'officer', 'assistant'), documentController.listAllDocuments);
 
 /**
  * @route GET /api/v1/documents/mine
- * @access worker
+ * @access worker, officer, assistant
  */
-router.get('/mine', authMiddleware, rbacMiddleware('worker'), documentController.getMyDocuments);
+router.get('/mine', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getMyDocuments);
 
 /**
  * @route GET /api/v1/documents/inbox
- * @access worker
+ * @access worker, officer, assistant
  */
-router.get('/inbox', authMiddleware, rbacMiddleware('worker'), documentController.getInbox);
+router.get('/inbox', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getInbox);
 
 /**
  * @route GET /api/v1/documents/:id
@@ -39,32 +39,32 @@ router.get('/:id', authMiddleware, documentController.getDocumentDetail);
 
 /**
  * @route POST /api/v1/documents
- * @access worker
+ * @access worker, officer
  */
-router.post('/', authMiddleware, rbacMiddleware('worker'), upload.single('file'), documentController.createDocument);
+router.post('/', authMiddleware, rbacMiddleware('worker', 'officer'), upload.single('file'), documentController.createDocument);
 
 /**
  * @route POST /api/v1/documents/:id/pickup
- * @access worker
+ * @access worker, officer, assistant
  */
-router.post('/:id/pickup', authMiddleware, rbacMiddleware('worker'), documentController.pickupDocument);
+router.post('/:id/pickup', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.pickupDocument);
 
 /**
  * @route POST /api/v1/documents/:id/start
- * @access worker
+ * @access worker, officer
  */
-router.post('/:id/start', authMiddleware, rbacMiddleware('worker'), documentController.startProcessing);
+router.post('/:id/start', authMiddleware, rbacMiddleware('worker', 'officer'), documentController.startProcessing);
 
 /**
  * @route POST /api/v1/documents/:id/complete
- * @access worker
+ * @access worker, officer
  */
-router.post('/:id/complete', authMiddleware, rbacMiddleware('worker'), documentController.completeDocument);
+router.post('/:id/complete', authMiddleware, rbacMiddleware('worker', 'officer'), documentController.completeDocument);
 
 /**
  * @route POST /api/v1/documents/:id/forward
- * @access worker
+ * @access worker, officer
  */
-router.post('/:id/forward', authMiddleware, rbacMiddleware('worker'), documentController.forwardDocument);
+router.post('/:id/forward', authMiddleware, rbacMiddleware('worker', 'officer'), documentController.forwardDocument);
 
 module.exports = router;

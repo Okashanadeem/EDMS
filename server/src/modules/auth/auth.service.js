@@ -11,9 +11,13 @@ require('dotenv').config();
  */
 const login = async (email, password) => {
   const query = `
-    SELECT u.id, u.name, u.email, u.password_hash, u.role, u.department_id, d.name as department_name
+    SELECT 
+      u.id, u.name, u.email, u.password_hash, u.role, u.department_id, 
+      d.name as department_name, u.officer_id, off.name as officer_name,
+      u.can_send_on_behalf
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
+    LEFT JOIN users off ON u.officer_id = off.id
     WHERE u.email = $1 AND u.is_active = TRUE
   `;
   
@@ -33,7 +37,9 @@ const login = async (email, password) => {
     { 
       id: user.id, 
       role: user.role, 
-      department_id: user.department_id 
+      department_id: user.department_id,
+      officer_id: user.officer_id,
+      can_send_on_behalf: user.can_send_on_behalf
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }
@@ -45,6 +51,32 @@ const login = async (email, password) => {
   return { accessToken, user };
 };
 
+/**
+ * Changes a user's password after verifying the current one.
+ */
+const changePassword = async (userId, currentPassword, newPassword) => {
+  // 1. Fetch user
+  const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1 AND is_active = TRUE', [userId]);
+  const user = userResult.rows[0];
+
+  if (!user) {
+    throw new Error('User not found or inactive.');
+  }
+
+  // 2. Verify current password
+  const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!isMatch) {
+    throw new Error('Current password does not match.');
+  }
+
+  // 3. Hash new password and update
+  const newHash = await bcrypt.hash(newPassword, 10);
+  await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+
+  return true;
+};
+
 module.exports = {
-  login
+  login,
+  changePassword
 };

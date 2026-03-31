@@ -6,11 +6,13 @@ The primary goal of Phase 1 is to deliver a functional MVP that replaces the pap
 ## 📋 Scope Definition
 - **Included Features:**
   - Login (JWT) and RBAC (Super Admin, Worker).
-  - Department management (CRUD, soft-delete).
-  - User management (Worker CRUD, one-time password sharing).
+  - Department management (CRUD, soft-delete, and worker list view).
+  - User management (Worker CRUD, one-time password sharing, and department filtering).
+  - **Self-Service Security:** Allow all users (Admin/Worker) to change their own passwords.
   - Document workflow (Create, Inbox, Pickup, Start, Forward, Complete).
   - Atomic Inward/Outward numbering sequences.
   - Audit logging for all state changes.
+  - **Internal Testing API & Visual API Book:** Dedicated endpoints for rapid data cleanup and a visual documentation reference for developers.
 - **Excluded Features:**
   - File storage in S3 (Phase 2).
   - OCR and full-text search (Phase 2).

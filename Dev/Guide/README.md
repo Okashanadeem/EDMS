@@ -43,14 +43,11 @@ Open your PostgreSQL terminal (psql) or use a GUI like pgAdmin/DBeaver:
    ```bash
    npm install
    ```
-3. Create a `.env` file (copy from `.env.example` if it exists):
+3. Create a `.env` file. For a detailed guide on what to put in this file and how to generate secure values, see **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)**.
    ```env
    DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/edms_db
    JWT_SECRET=your_super_secret_random_string_here
-   JWT_EXPIRES_IN=8h
-   PORT=4000
-   NODE_ENV=development
-   UPLOAD_DIR=./uploads
+   ...
    ```
    *(Replace `YOUR_PASSWORD` with your actual PostgreSQL password).*
 
@@ -113,3 +110,24 @@ Use these to log in for the first time as Super Admin:
 - **Database Connection Error:** Ensure PostgreSQL service is running and your password in `server/.env` is correct.
 - **Port 4000/5173 Busy:** Ensure no other instances of the app are running.
 - **401 Unauthorized:** Your token might have expired. Log out and log back in.
+
+---
+
+## 🧹 Full System Cleanup (Internal Testing Only)
+
+To wipe all documents, logs, departments, and non-admin users while resetting the system to its initial state, use the built-in testing utility. 
+
+### ⚠️ Warning: This action is irreversible.
+
+#### Using PowerShell (Windows)
+Run this command while the backend server is active:
+```powershell
+Invoke-RestMethod -Uri "http://localhost:4000/api/v1/test/cleanup" -Method Post -Headers @{"x-internal-test"="true"}
+```
+
+#### Using cURL / Postman
+- **Method:** `POST`
+- **URL:** `http://localhost:4000/api/v1/test/cleanup`
+- **Header:** `x-internal-test: true`
+
+**Note:** This utility preserves the initial `superadmin@edms.local` account from `seed.sql`.

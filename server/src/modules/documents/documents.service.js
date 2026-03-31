@@ -4,9 +4,15 @@ const auditLog = require('../../utils/auditLogger');
 
 /**
  * Creates and dispatches a document.
- * Transactional: Insert Doc + Generate Outward No + Audit Log.
+ * Transactional: Insert Doc + Generate Outward No + CC/BCC + References + Audit Log.
  */
-const createDocument = async ({ subject, body, file_path, receiver_department_id, created_by, sender_department_id }) => {
+const createDocument = async (data) => {
+  const { 
+    subject, body_html, body, file_path, 
+    receiver_department_id, created_by, sender_department_id,
+    cc, bcc, references, is_restricted, restricted_to_user_id
+  } = data;
+
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -17,25 +23,63 @@ const createDocument = async ({ subject, body, file_path, receiver_department_id
     // 2. Insert Document
     const insertDocQuery = `
       INSERT INTO documents (
-        subject, body, file_path, status, created_by, 
-        sender_department_id, receiver_department_id, outward_number
+        subject, body_html, body, file_path, status, created_by, 
+        sender_department_id, receiver_department_id, outward_number,
+        is_restricted, restricted_to_user_id
       )
-      VALUES ($1, $2, $3, 'in_transit', $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, 'in_transit', $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
     const docResult = await client.query(insertDocQuery, [
-      subject, body, file_path, created_by, 
-      sender_department_id, receiver_department_id, outwardNumber
+      subject, body_html, body || '', file_path, created_by, 
+      sender_department_id, receiver_department_id, outwardNumber,
+      is_restricted || false, restricted_to_user_id || null
     ]);
     const document = docResult.rows[0];
 
-    // 3. Write Audit Log
+    // 3. Handle CC/BCC
+    if (cc && Array.isArray(cc)) {
+      for (const deptId of cc) {
+        await client.query(
+          'INSERT INTO document_recipients (document_id, department_id, recipient_type) VALUES ($1, $2, $3)',
+          [document.id, deptId, 'cc']
+        );
+      }
+    }
+    if (bcc && Array.isArray(bcc)) {
+      for (const deptId of bcc) {
+        await client.query(
+          'INSERT INTO document_recipients (document_id, department_id, recipient_type) VALUES ($1, $2, $3)',
+          [document.id, deptId, 'bcc']
+        );
+      }
+    }
+
+    // 4. Handle References
+    if (references && Array.isArray(references)) {
+      for (const refId of references) {
+        await client.query(
+          'INSERT INTO document_references (document_id, reference_id) VALUES ($1, $2)',
+          [document.id, refId]
+        );
+      }
+    }
+
+    // 5. Write Audit Log
+    const receiverDeptResult = await client.query('SELECT name FROM departments WHERE id = $1', [receiver_department_id]);
+    const receiverDeptName = receiverDeptResult.rows[0]?.name || 'Unknown';
+
     await auditLog({
       actorId: created_by,
       action: 'document.created',
       entityType: 'document',
       entityId: document.id,
-      metadata: { subject, outward_number: outwardNumber, receiver_department_id },
+      metadata: { 
+        subject, 
+        outward_number: outwardNumber, 
+        receiver_department: receiverDeptName,
+        is_restricted: document.is_restricted
+      },
       client
     });
 
@@ -50,19 +94,36 @@ const createDocument = async ({ subject, body, file_path, receiver_department_id
 };
 
 /**
- * Lists documents for a department's inbox (in_transit, unclaimed).
+ * Helper to redact restricted document content for unauthorized users.
  */
-const getInbox = async (departmentId) => {
+const applyRestriction = (doc, userId, role) => {
+  if (doc.is_restricted && role !== 'super_admin' && doc.restricted_to_user_id !== userId) {
+    doc.body_html = null;
+    doc.body = null;
+    doc.file_path = null;
+    doc.is_redacted = true;
+  }
+  return doc;
+};
+
+/**
+ * Lists documents for a department's inbox (in_transit, unclaimed).
+ * Includes CC/BCC recipients.
+ */
+const getInbox = async (departmentId, userId, role) => {
   const query = `
-    SELECT d.*, u.name as creator_name, sd.name as sender_department_name
+    SELECT DISTINCT d.*, u.name as creator_name, sd.name as sender_department_name
     FROM documents d
     JOIN users u ON d.created_by = u.id
     JOIN departments sd ON d.sender_department_id = sd.id
-    WHERE d.receiver_department_id = $1 AND d.status = 'in_transit' AND d.assigned_to IS NULL
+    LEFT JOIN document_recipients dr ON d.id = dr.document_id
+    WHERE (d.receiver_department_id = $1 OR dr.department_id = $1)
+      AND d.status = 'in_transit' 
+      AND d.assigned_to IS NULL
     ORDER BY d.created_at DESC
   `;
   const result = await db.query(query, [departmentId]);
-  return result.rows;
+  return result.rows.map(doc => applyRestriction(doc, userId, role));
 };
 
 /**
@@ -98,12 +159,19 @@ const pickupDocument = async (id, workerId, departmentId) => {
     const finalDoc = finalResult.rows[0];
 
     // 4. Write Audit Log
+    const deptResult = await client.query('SELECT name FROM departments WHERE id = $1', [departmentId]);
+    const deptName = deptResult.rows[0]?.name || 'Unknown';
+
     await auditLog({
       actorId: workerId,
       action: 'document.picked_up',
       entityType: 'document',
       entityId: id,
-      metadata: { inward_number: inwardNumber, subject: finalDoc.subject },
+      metadata: { 
+        inward_number: inwardNumber, 
+        subject: finalDoc.subject,
+        receiver_department: deptName 
+      },
       client
     });
 
@@ -198,15 +266,19 @@ const forwardDocument = async (id, workerId, { to_department_id, note }) => {
     ]);
 
     // 5. Audit Log
+    const fromDeptResult = await client.query('SELECT name FROM departments WHERE id = $1', [currentDoc.receiver_department_id]);
+    const toDeptResult = await client.query('SELECT name FROM departments WHERE id = $1', [to_department_id]);
+    
     await auditLog({
       actorId: workerId,
       action: 'document.forwarded',
       entityType: 'document',
       entityId: id,
       metadata: { 
-        from_dept_id: currentDoc.receiver_department_id, 
-        to_dept_id: to_department_id,
-        new_outward_number: newOutwardNumber
+        from_department: fromDeptResult.rows[0]?.name || 'Unknown', 
+        to_department: toDeptResult.rows[0]?.name || 'Unknown',
+        new_outward_number: newOutwardNumber,
+        note
       },
       client
     });
@@ -222,26 +294,29 @@ const forwardDocument = async (id, workerId, { to_department_id, note }) => {
 };
 
 /**
- * Lists documents assigned to or created by a worker.
+ * Lists documents assigned to, created by, or CC'd to the worker's department.
  */
-const getMyDocuments = async (workerId) => {
+const getMyDocuments = async (userId, departmentId, role) => {
   const query = `
-    SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name
+    SELECT DISTINCT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name
     FROM documents d
     JOIN users u ON d.created_by = u.id
     JOIN departments sd ON d.sender_department_id = sd.id
     JOIN departments rd ON d.receiver_department_id = rd.id
-    WHERE d.assigned_to = $1 OR d.created_by = $1
+    LEFT JOIN document_recipients dr ON d.id = dr.document_id
+    WHERE d.assigned_to = $1 
+       OR d.created_by = $1 
+       OR (dr.department_id = $2 AND dr.recipient_type = 'cc')
     ORDER BY d.updated_at DESC
   `;
-  const result = await db.query(query, [workerId]);
-  return result.rows;
+  const result = await db.query(query, [userId, departmentId]);
+  return result.rows.map(doc => applyRestriction(doc, userId, role));
 };
 
 /**
  * Lists all documents system-wide (Super Admin).
  */
-const listAllDocuments = async ({ department_id, status, assigned_to }) => {
+const listAllDocuments = async ({ department_id, status, assigned_to }, userId, role) => {
   let query = `
     SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name, au.name as assignee_name
     FROM documents d
@@ -249,7 +324,7 @@ const listAllDocuments = async ({ department_id, status, assigned_to }) => {
     JOIN departments sd ON d.sender_department_id = sd.id
     JOIN departments rd ON d.receiver_department_id = rd.id
     LEFT JOIN users au ON d.assigned_to = au.id
-    WHERE 1=1
+    WHERE status != 'draft'
   `;
   const params = [];
   let counter = 1;
@@ -270,13 +345,13 @@ const listAllDocuments = async ({ department_id, status, assigned_to }) => {
 
   query += ' ORDER BY d.created_at DESC';
   const result = await db.query(query, params);
-  return result.rows;
+  return result.rows.map(doc => applyRestriction(doc, userId, role));
 };
 
 /**
- * Fetches full document detail including audit trail and forwarding history.
+ * Fetches full document detail including CC/BCC, references, audit trail, and forwarding history.
  */
-const getDocumentDetail = async (id) => {
+const getDocumentDetail = async (id, userId, role, userDeptId) => {
   // 1. Basic Info
   const docQuery = `
     SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name, au.name as assignee_name
@@ -288,11 +363,44 @@ const getDocumentDetail = async (id) => {
     WHERE d.id = $1
   `;
   const docResult = await db.query(docQuery, [id]);
-  const document = docResult.rows[0];
+  let document = docResult.rows[0];
 
   if (!document) return null;
 
-  // 2. Forwarding History
+  // Apply Phase 1.1 Restrictions
+  document = applyRestriction(document, userId, role);
+
+  // 2. CC/BCC Recipients
+  // Rules: BCC is hidden from primary and CC receivers.
+  let recipientQuery = `
+    SELECT dr.*, d.name as department_name
+    FROM document_recipients dr
+    JOIN departments d ON dr.department_id = d.id
+    WHERE dr.document_id = $1
+  `;
+  const recipientResult = await db.query(recipientQuery, [id]);
+  const allRecipients = recipientResult.rows;
+
+  document.cc = allRecipients.filter(r => r.recipient_type === 'cc');
+  
+  // BCC Visibility Rule: Only Super Admin or the recipient department itself can see BCC entry
+  if (role === 'super_admin') {
+    document.bcc = allRecipients.filter(r => r.recipient_type === 'bcc');
+  } else {
+    document.bcc = allRecipients.filter(r => r.recipient_type === 'bcc' && r.department_id === userDeptId);
+  }
+
+  // 3. References
+  const refQuery = `
+    SELECT r.id, r.subject, r.outward_number, r.status
+    FROM document_references dr
+    JOIN documents r ON dr.reference_id = r.id
+    WHERE dr.document_id = $1
+  `;
+  const refResult = await db.query(refQuery, [id]);
+  document.references = refResult.rows;
+
+  // 4. Forwarding History
   const forwardQuery = `
     SELECT df.*, u.name as from_user_name, fd.name as from_department_name, td.name as to_department_name
     FROM document_forwards df
@@ -305,7 +413,7 @@ const getDocumentDetail = async (id) => {
   const forwardResult = await db.query(forwardQuery, [id]);
   document.forwarding_history = forwardResult.rows;
 
-  // 3. Audit Trail
+  // 5. Audit Trail
   const auditQuery = `
     SELECT al.*, u.name as actor_name
     FROM audit_logs al

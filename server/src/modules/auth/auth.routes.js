@@ -12,8 +12,14 @@ router.post('/login', authController.login);
 
 /**
  * @route POST /api/v1/auth/logout
- * @access Auth
+ * @access auth
  */
 router.post('/logout', authMiddleware, authController.logout);
+
+/**
+ * @route PATCH /api/v1/auth/change-password
+ * @access auth
+ */
+router.patch('/change-password', authMiddleware, authController.changePassword);
 
 module.exports = router;
