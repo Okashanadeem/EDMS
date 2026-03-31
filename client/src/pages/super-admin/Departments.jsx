@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
-import { Plus, Edit2, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, AlertCircle, Users } from 'lucide-react';
 
 const Departments = () => {
   const [departments, setDepartments] = useState([]);
@@ -59,13 +60,14 @@ const Departments = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this department?')) {
+  const handleDelete = async (dept) => {
+    const action = dept.is_active ? 'deactivate' : 'activate';
+    if (window.confirm(`Are you sure you want to ${action} this department?`)) {
       try {
-        await api.delete(`/departments/${id}`);
+        await api.patch(`/departments/${dept.id}`, { is_active: !dept.is_active });
         fetchDepartments();
       } catch (err) {
-        setError('Failed to deactivate department');
+        setError(`Failed to ${action} department`);
       }
     }
   };
@@ -144,19 +146,29 @@ const Departments = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(dept)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(dept.id)}
-                      className="text-red-600 hover:text-red-900"
-                      disabled={!dept.is_active}
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div className="flex justify-end gap-3">
+                      <Link
+                        to={`/admin/users?department=${dept.id}`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="View Workers"
+                      >
+                        <Users size={18} />
+                      </Link>
+                      <button
+                        onClick={() => handleEdit(dept)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit Department"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(dept)}
+                        className={`${dept.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                        title={dept.is_active ? 'Deactivate Department' : 'Activate Department'}
+                      >
+                        {dept.is_active ? <Trash2 size={18} /> : <Check size={18} />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

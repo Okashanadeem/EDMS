@@ -25,7 +25,10 @@ app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
 app.use('/api/v1/departments', require('./modules/departments/departments.routes'));
 app.use('/api/v1/users', require('./modules/users/users.routes'));
 app.use('/api/v1/documents', require('./modules/documents/documents.routes'));
+app.use('/api/v1/drafts', require('./modules/drafts/drafts.routes'));
+app.use('/api/v1/otp', require('./modules/otp/otp.routes'));
 app.use('/api/v1/audit', require('./modules/audit/audit.routes'));
+app.use('/api/v1/test', require('./modules/test/test.routes'));
 
 // 404 Handler
 app.use((req, res) => {

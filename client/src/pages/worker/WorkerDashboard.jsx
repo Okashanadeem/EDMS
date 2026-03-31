@@ -66,7 +66,7 @@ const WorkerDashboard = () => {
           <p className="text-gray-500 mt-1">Overview of your tasks and departmental documents.</p>
         </div>
         <Link 
-          to="/worker/create"
+          to="/worker/compose"
           className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
         >
           <PlusCircle size={20} className="mr-2" />

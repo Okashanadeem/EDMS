@@ -18,6 +18,14 @@ The Electronic Document Management System (EDMS) is a centralized, digital workf
 - Inward/Outward department-wise auto-numbering.
 - Atomic audit logging for all critical actions.
 
+### Phase 1.1: Extended Correspondence - 🚀 **Current**
+- New Roles: `officer`, `assistant`.
+- Rich Text Editor (Tiptap) and Compose canvas.
+- Draft & Review cycles (Officer/Assistant workflow).
+- OTP-delegated document dispatch.
+- CC / BCC and Reference Linking.
+- Document access restriction.
+
 ### Phase 2: Enhanced Capabilities - 🛠️ **Future**
 - S3/Object Storage integration.
 - Full-Text Search (using PostgreSQL GIN indexes).

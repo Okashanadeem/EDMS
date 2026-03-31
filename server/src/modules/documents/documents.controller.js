@@ -5,7 +5,10 @@ const { saveFile } = require('../../utils/storage');
  * Handles document creation and dispatch.
  */
 const createDocument = async (req, res) => {
-  const { subject, body, receiver_department_id } = req.body;
+  const { 
+    subject, body_html, body, receiver_department_id, 
+    cc, bcc, references, is_restricted, restricted_to_user_id 
+  } = req.body;
   const workerId = req.user.id;
   const senderDeptId = req.user.department_id;
 
@@ -22,11 +25,13 @@ const createDocument = async (req, res) => {
 
     const data = await documentService.createDocument({
       subject,
+      body_html,
       body,
       file_path: filePath,
       receiver_department_id,
       created_by: workerId,
-      sender_department_id: senderDeptId
+      sender_department_id: senderDeptId,
+      cc, bcc, references, is_restricted, restricted_to_user_id
     });
 
     res.status(201).json({ success: true, data });
@@ -40,7 +45,7 @@ const createDocument = async (req, res) => {
  */
 const getInbox = async (req, res) => {
   try {
-    const data = await documentService.getInbox(req.user.department_id);
+    const data = await documentService.getInbox(req.user.department_id, req.user.id, req.user.role);
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch inbox.' });
@@ -130,7 +135,7 @@ const forwardDocument = async (req, res) => {
  */
 const getMyDocuments = async (req, res) => {
   try {
-    const data = await documentService.getMyDocuments(req.user.id);
+    const data = await documentService.getMyDocuments(req.user.id, req.user.department_id, req.user.role);
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch your documents.' });
@@ -143,7 +148,11 @@ const getMyDocuments = async (req, res) => {
 const listAllDocuments = async (req, res) => {
   const { department_id, status, assigned_to } = req.query;
   try {
-    const data = await documentService.listAllDocuments({ department_id, status, assigned_to });
+    const data = await documentService.listAllDocuments(
+      { department_id, status, assigned_to },
+      req.user.id,
+      req.user.role
+    );
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch documents.' });
@@ -156,24 +165,32 @@ const listAllDocuments = async (req, res) => {
 const getDocumentDetail = async (req, res) => {
   const { id } = req.params;
   try {
-    const data = await documentService.getDocumentDetail(id);
+    const data = await documentService.getDocumentDetail(
+      id, 
+      req.user.id, 
+      req.user.role, 
+      req.user.department_id
+    );
+    
     if (!data) {
       return res.status(404).json({ success: false, error: 'Document not found.' });
     }
     
-    // RBAC: Super Admin can see all, Worker can see if they belong to sender/receiver dept or are assigned/creator.
-    if (req.user.role === 'worker') {
+    // Authorization check (additional to server-side redaction)
+    if (req.user.role !== 'super_admin') {
       const isSenderDept = data.sender_department_id === req.user.department_id;
       const isReceiverDept = data.receiver_department_id === req.user.department_id;
       const isCreator = data.created_by === req.user.id;
       const isAssignee = data.assigned_to === req.user.id;
+      const isCCd = data.cc && data.cc.some(r => r.department_id === req.user.department_id);
+      const isBCCd = data.bcc && data.bcc.some(r => r.department_id === req.user.department_id);
       
-      if (!isSenderDept && !isReceiverDept && !isCreator && !isAssignee) {
+      if (!isSenderDept && !isReceiverDept && !isCreator && !isAssignee && !isCCd && !isBCCd) {
         return res.status(403).json({ success: false, error: 'Not authorized to view this document.' });
       }
     }
     
-    res.status(200).json({ success: true, ...data });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch document details.' });
   }

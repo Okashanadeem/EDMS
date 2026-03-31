@@ -34,3 +34,5 @@
 - [x] Implement Document Forwarding & Processing (Milestone 4)
 - [x] Initialize React Frontend (Milestone 5)
 - [x] Implement All Role-Based Dashboards and Workflows (Milestone 5)
+- [x] Finalize Visual API Book and Internal Testing Utilities (Phase 1 Cleanup)
+- [x] Verified Self-Service Password Management (Backend/Frontend)

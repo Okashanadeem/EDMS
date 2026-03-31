@@ -38,14 +38,14 @@ const createDepartment = async (req, res) => {
  */
 const updateDepartment = async (req, res) => {
   const { id } = req.params;
-  const { name, code } = req.body;
+  const updates = req.body;
 
-  if (!name || !code) {
-    return res.status(400).json({ success: false, error: 'Name and code are required.' });
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ success: false, error: 'No update fields provided.' });
   }
 
   try {
-    const data = await departmentService.updateDepartment(id, { name, code });
+    const data = await departmentService.updateDepartment(id, updates);
     if (!data) {
       return res.status(404).json({ success: false, error: 'Department not found.' });
     }

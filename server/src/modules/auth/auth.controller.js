@@ -38,7 +38,36 @@ const logout = async (req, res) => {
   });
 };
 
+/**
+ * Handles password change for authenticated users.
+ */
+const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Current password and new password are required.' 
+    });
+  }
+
+  try {
+    await authService.changePassword(userId, currentPassword, newPassword);
+    res.status(200).json({ 
+      success: true, 
+      message: 'Password updated successfully.' 
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   login,
-  logout
+  logout,
+  changePassword
 };

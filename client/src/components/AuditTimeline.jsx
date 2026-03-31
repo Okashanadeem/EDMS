@@ -7,6 +7,7 @@ import {
   ArrowRight, 
   Play, 
   Send,
+  PlusCircle,
   MoreVertical
 } from 'lucide-react';
 
@@ -52,8 +53,11 @@ const AuditTimeline = ({ logs }) => {
                     </p>
                     {log.metadata && (
                       <div className="mt-1 text-xs text-gray-500 space-y-1">
+                        {log.metadata.receiver_department && (
+                          <p>Target: <span className="font-semibold text-gray-700">{log.metadata.receiver_department}</span></p>
+                        )}
                         {log.metadata.from_department && (
-                          <p>From: <span className="font-semibold">{log.metadata.from_department}</span> → <span className="font-semibold">{log.metadata.to_department}</span></p>
+                          <p>From: <span className="font-semibold text-gray-700">{log.metadata.from_department}</span> → <span className="font-semibold text-gray-700">{log.metadata.to_department}</span></p>
                         )}
                         {log.metadata.inward_number && (
                           <p>Inward No: <span className="font-mono text-gray-700">{log.metadata.inward_number}</span></p>
@@ -80,14 +84,5 @@ const AuditTimeline = ({ logs }) => {
     </div>
   );
 };
-
-// Re-defining icons used in getActionIcon but not imported properly from lucide-react in the snippet
-const PlusCircle = ({ size, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="16" />
-    <line x1="8" y1="12" x2="16" y2="12" />
-  </svg>
-);
 
 export default AuditTimeline;

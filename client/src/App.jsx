@@ -2,18 +2,31 @@ import React from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Layouts
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import WorkerLayout from './layouts/WorkerLayout';
+import OfficerLayout from './layouts/OfficerLayout';
+import AssistantLayout from './layouts/AssistantLayout';
+
+// Admin Pages
 import Departments from './pages/super-admin/Departments';
 import UserManagement from './pages/super-admin/UserManagement';
 import SystemDashboard from './pages/super-admin/SystemDashboard';
 import AllDocuments from './pages/super-admin/AllDocuments';
 import AuditLog from './pages/super-admin/AuditLog';
-import CreateDocument from './pages/worker/CreateDocument';
+
+// Common Pages (Phase 1.1)
+import Compose from './pages/common/Compose';
+import Drafts from './pages/common/Drafts';
+import DocumentDetail from './pages/common/DocumentDetail';
+
+// Role Specific Dashboards
+import WorkerDashboard from './pages/worker/WorkerDashboard';
+import OfficerDashboard from './pages/officer/OfficerDashboard';
+import AssistantDashboard from './pages/assistant/AssistantDashboard';
 import DeptInbox from './pages/worker/DeptInbox';
 import MyDocuments from './pages/worker/MyDocuments';
-import DocumentDetail from './pages/worker/DocumentDetail';
-import WorkerDashboard from './pages/worker/WorkerDashboard';
 
 // Basic Login Component
 const LoginPage = () => {
@@ -24,11 +37,10 @@ const LoginPage = () => {
   const [error, setError] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // If already authenticated, redirect to appropriate dashboard
   React.useEffect(() => {
     if (isAuthenticated && user) {
-      const redirectPath = user.role === 'super_admin' ? '/admin/dashboard' : '/worker/dashboard';
-      navigate(redirectPath, { replace: true });
+      const path = user.role === 'super_admin' ? 'admin' : user.role;
+      navigate(`/${path}/dashboard`, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -36,77 +48,43 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    
     const result = await login(email, password);
     setIsSubmitting(false);
-    
-    if (result.success) {
-      const redirectPath = result.user.role === 'super_admin' ? '/admin/dashboard' : '/worker/dashboard';
-      navigate(redirectPath, { replace: true });
-    } else {
-      setError(result.message);
-    }
+    if (!result.success) setError(result.message);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 font-sans">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl shadow-xl shadow-slate-200 border border-slate-100">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
-            <span className="text-white font-bold text-2xl">E</span>
+          <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-200">
+            <span className="text-white font-black text-3xl">E</span>
           </div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900 tracking-tight">
-            EDMS Login
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Sign in to access your document dashboard
-          </p>
+          <h2 className="text-center text-3xl font-black text-slate-900 tracking-tight">EDMS Portal</h2>
+          <p className="mt-2 text-sm font-medium text-slate-500 uppercase tracking-widest">Correspondence Management</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+          {error && <div className="bg-red-50 border-l-4 border-red-400 p-4 text-xs font-bold text-red-700">{error}</div>}
           <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 outline-none"
-                placeholder="superadmin@edms.local"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 outline-none"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            <input
+              type="email" required
+              className="block w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              placeholder="Email Address"
+              value={email} onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              type="password" required
+              className="block w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              placeholder="Password"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
-          <div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
+          <button
+            type="submit" disabled={isSubmitting}
+            className="w-full flex justify-center py-4 px-4 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
+          >
+            {isSubmitting ? 'Authenticating...' : 'Sign In'}
+          </button>
         </form>
       </div>
     </div>
@@ -116,8 +94,9 @@ const LoginPage = () => {
 const RoleRedirect = () => {
   const { user, isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!user) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>;
-  return user.role === 'super_admin' ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/worker/dashboard" replace />;
+  if (!user) return null;
+  const path = user.role === 'super_admin' ? 'admin' : user.role;
+  return <Navigate to={`/${path}/dashboard`} replace />;
 };
 
 const App = () => {
@@ -125,7 +104,7 @@ const App = () => {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       
-      {/* Super Admin Routes */}
+      {/* Super Admin */}
       <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
         <Route element={<SuperAdminLayout />}>
           <Route path="/admin/dashboard" element={<SystemDashboard />} />
@@ -133,17 +112,45 @@ const App = () => {
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/documents" element={<AllDocuments />} />
           <Route path="/admin/audit" element={<AuditLog />} />
+          <Route path="/admin/document/:id" element={<DocumentDetail />} />
         </Route>
       </Route>
 
-      {/* Worker Routes */}
+      {/* Worker */}
       <Route element={<ProtectedRoute allowedRoles={['worker']} />}>
         <Route element={<WorkerLayout />}>
           <Route path="/worker/dashboard" element={<WorkerDashboard />} />
+          <Route path="/worker/compose" element={<Compose />} />
+          <Route path="/worker/compose/:id" element={<Compose />} />
+          <Route path="/worker/drafts" element={<Drafts />} />
           <Route path="/worker/inbox" element={<DeptInbox />} />
-          <Route path="/worker/create" element={<CreateDocument />} />
           <Route path="/worker/my-documents" element={<MyDocuments />} />
           <Route path="/worker/document/:id" element={<DocumentDetail />} />
+        </Route>
+      </Route>
+
+      {/* Officer */}
+      <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
+        <Route element={<OfficerLayout />}>
+          <Route path="/officer/dashboard" element={<OfficerDashboard />} />
+          <Route path="/officer/compose" element={<Compose />} />
+          <Route path="/officer/compose/:id" element={<Compose />} />
+          <Route path="/officer/drafts" element={<Drafts />} />
+          <Route path="/officer/inbox" element={<DeptInbox role="officer" />} />
+          <Route path="/officer/my-documents" element={<MyDocuments />} />
+          <Route path="/officer/document/:id" element={<DocumentDetail />} />
+        </Route>
+      </Route>
+
+      {/* Assistant */}
+      <Route element={<ProtectedRoute allowedRoles={['assistant']} />}>
+        <Route element={<AssistantLayout />}>
+          <Route path="/assistant/dashboard" element={<AssistantDashboard />} />
+          <Route path="/assistant/compose" element={<Compose />} />
+          <Route path="/assistant/compose/:id" element={<Compose />} />
+          <Route path="/assistant/drafts" element={<Drafts />} />
+          <Route path="/assistant/inbox" element={<DeptInbox role="assistant" />} />
+          <Route path="/assistant/document/:id" element={<DocumentDetail />} />
         </Route>
       </Route>
 

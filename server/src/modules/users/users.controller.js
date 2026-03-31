@@ -1,12 +1,12 @@
 const userService = require('./users.service');
 
 /**
- * Handles listing all users.
+ * Handles listing all users. Supports filtering by department_id and role.
  */
 const listUsers = async (req, res) => {
-  const { department_id } = req.query;
+  const { department_id, role } = req.query;
   try {
-    const data = await userService.listUsers(department_id);
+    const data = await userService.listUsers({ departmentId: department_id, role });
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch users.' });
@@ -14,23 +14,30 @@ const listUsers = async (req, res) => {
 };
 
 /**
- * Handles creating a new worker.
+ * Handles creating a new user (worker, officer, assistant).
  */
 const createUser = async (req, res) => {
-  const { name, email, department_id } = req.body;
+  const { name, email, role, department_id, officer_id, can_send_on_behalf } = req.body;
 
   if (!name || !email || !department_id) {
     return res.status(400).json({ success: false, error: 'Name, email, and department_id are required.' });
   }
 
   try {
-    const data = await userService.createUser({ name, email, department_id });
+    const data = await userService.createUser({ 
+      name, 
+      email, 
+      role, 
+      department_id, 
+      officer_id, 
+      can_send_on_behalf 
+    });
     res.status(201).json({ success: true, ...data });
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Email already exists.' });
     }
-    res.status(500).json({ success: false, error: 'Failed to create user.' });
+    res.status(500).json({ success: false, error: error.message || 'Failed to create user.' });
   }
 };
 
@@ -39,14 +46,14 @@ const createUser = async (req, res) => {
  */
 const updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, department_id } = req.body;
+  const updates = req.body;
 
-  if (!name || !department_id) {
-    return res.status(400).json({ success: false, error: 'Name and department_id are required.' });
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ success: false, error: 'No update fields provided.' });
   }
 
   try {
-    const data = await userService.updateUser(id, { name, department_id });
+    const data = await userService.updateUser(id, updates);
     if (!data) {
       return res.status(404).json({ success: false, error: 'User not found.' });
     }
