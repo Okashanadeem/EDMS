@@ -34,6 +34,8 @@ const Compose = () => {
   const [filePreview, setFilePreview] = useState(null);
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState(id || null);
+  const [existingFile, setExistingFile] = useState(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -69,11 +71,20 @@ const Compose = () => {
       if (draft) {
         setSubject(draft.subject);
         setBodyHtml(draft.body_html || '');
-        setReceiverDeptId(draft.receiver_department_id);
+        setReceiverDeptId(draft.receiver_department_id || '');
         setIsRestricted(draft.is_restricted);
         setRestrictedTo(draft.restricted_to_user_id);
-        setBehalfOfOfficerId(draft.behalf_of_officer_id);
+        setBehalfOfOfficerId(draft.behalf_of_officer_id || '');
+        setSelectedCC(draft.cc || []);
+        setSelectedBCC(draft.bcc || []);
+        setSelectedRefs(draft.references || []);
         setActiveDraftId(draft.id);
+        setExistingFile(draft.file_path);
+
+        // Restriction logic: Assistant can't edit if submitted and no revision note
+        if (user.role === 'assistant' && draft.draft_submitted_at && !draft.draft_revision_note) {
+          setIsReadOnly(true);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch draft details');
@@ -98,20 +109,33 @@ const Compose = () => {
         subject,
         body_html: bodyHtml,
         receiver_department_id: receiverDeptId,
-        cc: selectedCC,
-        bcc: selectedBCC,
-        references: selectedRefs.map(r => r.id),
+        cc: JSON.stringify(selectedCC),
+        bcc: JSON.stringify(selectedBCC),
+        references: JSON.stringify(selectedRefs.map(r => r.id)),
         is_restricted: isRestricted,
         restricted_to_user_id: restrictedTo,
-        behalf_of_officer_id: (user.role === 'assistant' || behalfOfOfficerId) ? (behalfOfOfficerId || user.officer_id) : null
+        behalf_of_officer_id: (user.role === 'assistant') ? (behalfOfOfficerId || user.officer_id) : null,
+        behalf_of_position_id: (user.role === 'assistant') ? (user.officer_position_id || null) : null
       };
+
+      const formData = new FormData();
+      Object.keys(payload).forEach(key => {
+        if (payload[key] !== null && payload[key] !== undefined) {
+          formData.append(key, payload[key]);
+        }
+      });
+      if (file) formData.append('file', file);
 
       if (isDraft || isAssistantSubmit) {
         let response;
         if (activeDraftId) {
-          response = await api.patch(`/drafts/${activeDraftId}`, payload);
+          response = await api.patch(`/drafts/${activeDraftId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
         } else {
-          response = await api.post('/drafts', payload);
+          response = await api.post('/drafts', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
         }
         
         const draftId = activeDraftId || response.data.data.id;
@@ -123,20 +147,15 @@ const Compose = () => {
           setTimeout(() => navigate('/assistant/drafts'), 1500);
         } else {
           setSuccessMsg('Draft saved successfully.');
-          if (!id) navigate(`${window.location.pathname}/${draftId}`, { replace: true });
+          if (!id) {
+             const newPath = window.location.pathname.endsWith('/compose') 
+                ? `${window.location.pathname}/${draftId}`
+                : window.location.pathname.replace(/\/compose\/.*$/, `/compose/${draftId}`);
+             navigate(newPath, { replace: true });
+          }
         }
       } else {
         // Direct Dispatch (Worker/Officer)
-        const formData = new FormData();
-        Object.keys(payload).forEach(key => {
-          if (Array.isArray(payload[key])) {
-            payload[key].forEach(item => formData.append(`${key}[]`, item));
-          } else if (payload[key] !== null) {
-            formData.append(key, payload[key]);
-          }
-        });
-        if (file) formData.append('file', file);
-
         const response = await api.post('/documents', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -158,16 +177,29 @@ const Compose = () => {
     try {
       const payload = {
         subject, body_html: bodyHtml, receiver_department_id: receiverDeptId,
-        cc: selectedCC, bcc: selectedBCC, references: selectedRefs.map(r => r.id),
+        cc: JSON.stringify(selectedCC), bcc: JSON.stringify(selectedBCC), 
+        references: JSON.stringify(selectedRefs.map(r => r.id)),
         is_restricted: isRestricted, restricted_to_user_id: restrictedTo,
         behalf_of_officer_id: behalfOfOfficerId || user.officer_id
       };
 
+      const formData = new FormData();
+      Object.keys(payload).forEach(key => {
+        if (payload[key] !== null && payload[key] !== undefined) {
+          formData.append(key, payload[key]);
+        }
+      });
+      if (file) formData.append('file', file);
+
       let response;
       if (activeDraftId) {
-        response = await api.patch(`/drafts/${activeDraftId}`, payload);
+        response = await api.patch(`/drafts/${activeDraftId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       } else {
-        response = await api.post('/drafts', payload);
+        response = await api.post('/drafts', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       }
       
       const draftId = activeDraftId || response.data.data.id;
@@ -181,8 +213,7 @@ const Compose = () => {
   };
 
   const onOtpSuccess = (data) => {
-    setSuccessMsg('Authorized & Dispatched successfully.');
-    setTimeout(() => navigate(`/assistant/document/${data.id}`), 1500);
+    navigate(`/assistant/document/${data.id}`);
   };
 
   return (
@@ -195,25 +226,50 @@ const Compose = () => {
           </div>
 
           <div className="space-y-4">
+            {isReadOnly && (
+              <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-xl flex items-center text-xs text-amber-700 font-bold mb-4">
+                <ShieldCheck className="mr-3" size={20} />
+                This draft is under review and cannot be modified.
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Subject</label>
-              <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none" placeholder="Enter subject..." value={subject} onChange={(e) => setSubject(e.target.value)} />
+              <input 
+                type="text" 
+                disabled={isReadOnly}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-60" 
+                placeholder="Enter subject..." 
+                value={subject} 
+                onChange={(e) => setSubject(e.target.value)} 
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Primary Receiver</label>
-              <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none" value={receiverDeptId} onChange={(e) => setReceiverDeptId(e.target.value)}>
+              <select 
+                disabled={isReadOnly}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-60" 
+                value={receiverDeptId} 
+                onChange={(e) => setReceiverDeptId(e.target.value)}
+              >
                 <option value="">Select Department...</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
 
             <hr className="border-slate-100" />
-            <CcBccSelector selectedCC={selectedCC} setSelectedCC={setSelectedCC} selectedBCC={selectedBCC} setSelectedBCC={setSelectedBCC} />
+            <div className={isReadOnly ? 'pointer-events-none opacity-60' : ''}>
+              <CcBccSelector selectedCC={selectedCC} setSelectedCC={setSelectedCC} selectedBCC={selectedBCC} setSelectedBCC={setSelectedBCC} />
+            </div>
             <hr className="border-slate-100" />
-            <ReferenceSearch selectedRefs={selectedRefs} setSelectedRefs={setSelectedRefs} />
+            <div className={isReadOnly ? 'pointer-events-none opacity-60' : ''}>
+              <ReferenceSearch selectedRefs={selectedRefs} setSelectedRefs={setSelectedRefs} />
+            </div>
             <hr className="border-slate-100" />
-            <RestrictionSelector isRestricted={isRestricted} setIsRestricted={setIsRestricted} restrictedTo={restrictedTo} setRestrictedTo={setRestrictedTo} />
+            <div className={isReadOnly ? 'pointer-events-none opacity-60' : ''}>
+              <RestrictionSelector isRestricted={isRestricted} setIsRestricted={setIsRestricted} restrictedTo={restrictedTo} setRestrictedTo={setRestrictedTo} />
+            </div>
 
             {user?.role === 'assistant' && (
               <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
@@ -227,19 +283,50 @@ const Compose = () => {
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attachment</label>
-              <div className="relative group cursor-pointer">
-                <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => setFile(e.target.files[0])} />
+              <div className={`relative group ${isReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                <input 
+                  type="file" 
+                  disabled={isReadOnly}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" 
+                  onChange={(e) => setFile(e.target.files[0])} 
+                />
                 <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center group-hover:border-indigo-400">
-                  {file ? <div className="flex items-center justify-center text-xs font-bold text-indigo-600"><FileText size={16} className="mr-2" /> {file.name}</div> : <div className="flex flex-col items-center text-slate-400"><Paperclip size={20} className="mb-1" /><span className="text-[10px] font-bold uppercase tracking-tighter">Upload File</span></div>}
+                  {file ? (
+                    <div className="flex items-center justify-center text-xs font-bold text-indigo-600"><FileText size={16} className="mr-2" /> {file.name}</div>
+                  ) : existingFile ? (
+                    <div className="flex items-center justify-center text-xs font-bold text-emerald-600"><Paperclip size={16} className="mr-2" /> Current Attachment</div>
+                  ) : (
+                    <div className="flex flex-col items-center text-slate-400"><Paperclip size={20} className="mb-1" /><span className="text-[10px] font-bold uppercase tracking-tighter">Upload File</span></div>
+                  )}
                 </div>
               </div>
             </div>
 
             {filePreview && (
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">File Preview</h4><button onClick={() => setFile(null)} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button></div>
+                <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">New File Preview</h4><button onClick={() => setFile(null)} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button></div>
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-white">
                   {filePreview.type.startsWith('image/') ? <img src={filePreview.url} alt="Preview" className="w-full h-auto max-h-64 object-contain mx-auto" /> : <div className="flex flex-col items-center py-8"><FileText size={48} className="text-indigo-200 mb-2" /><p className="text-[10px] font-bold text-indigo-600">PDF LOADED</p></div>}
+                </div>
+              </div>
+            )}
+
+            {!filePreview && existingFile && (
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saved Attachment</h4>
+                  {!isReadOnly && <button onClick={() => setExistingFile(null)} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button>}
+                </div>
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white p-4 flex flex-col items-center">
+                   <FileText size={32} className="text-indigo-400 mb-2" />
+                   <a 
+                    href={`${import.meta.env.VITE_API_URL}/uploads/${existingFile}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-bold text-indigo-600 hover:underline uppercase tracking-tighter"
+                   >
+                     View File in New Tab
+                   </a>
                 </div>
               </div>
             )}
@@ -249,25 +336,27 @@ const Compose = () => {
         {error && <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-xl flex items-center text-xs text-red-700 font-bold"><AlertCircle className="mr-3" size={20} />{error}</div>}
         {successMsg && <div className="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded-xl flex items-center text-xs text-emerald-700 font-bold"><UserCheck className="mr-3" size={20} />{successMsg}</div>}
 
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
-            <button onClick={() => handleAction('draft')} disabled={saveLoading} className="flex-1 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 shadow-sm flex items-center justify-center">
-              <Save size={18} className="mr-2" /> Save Draft
-            </button>
-            <button onClick={() => handleAction('dispatch')} disabled={loading} className="flex-[2] bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center justify-center">
-              {loading ? 'Processing...' : (user?.role === 'assistant' ? <><Send size={18} className="mr-2" /> Submit to Officer</> : <><Send size={18} className="mr-2" /> Dispatch Now</>)}
-            </button>
+        {!isReadOnly && (
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <button onClick={() => handleAction('draft')} disabled={saveLoading} className="flex-1 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 shadow-sm flex items-center justify-center">
+                <Save size={18} className="mr-2" /> Save Draft
+              </button>
+              <button onClick={() => handleAction('dispatch')} disabled={loading} className="flex-[2] bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center justify-center">
+                {loading ? 'Processing...' : (user?.role === 'assistant' ? <><Send size={18} className="mr-2" /> Submit to Officer</> : <><Send size={18} className="mr-2" /> Dispatch Now</>)}
+              </button>
+            </div>
+            {user?.role === 'assistant' && user?.can_send_on_behalf && (
+              <button onClick={handleDelegatedSend} disabled={saveLoading || loading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-xs hover:bg-black transition-all flex items-center justify-center border-2 border-indigo-500/30">
+                <ShieldCheck size={16} className="mr-2 text-indigo-400" /> Authorized Dispatch (OTP Path)
+              </button>
+            )}
           </div>
-          {user?.role === 'assistant' && user?.can_send_on_behalf && (
-            <button onClick={handleDelegatedSend} disabled={saveLoading || loading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-xs hover:bg-black transition-all flex items-center justify-center border-2 border-indigo-500/30">
-              <ShieldCheck size={16} className="mr-2 text-indigo-400" /> Authorized Dispatch (OTP Path)
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-[800px]">
-        <RichTextEditor content={bodyHtml} onChange={setBodyHtml} />
+        <RichTextEditor content={bodyHtml} onChange={setBodyHtml} readOnly={isReadOnly} />
       </div>
 
       <OtpModal isOpen={isOtpModalOpen} onClose={() => setIsOtpModalOpen(false)} documentId={activeDraftId} onSuccess={onOtpSuccess} />

@@ -3,8 +3,8 @@
 ## 📊 Summary (Phase 1.1)
 - **Status:** Completed
 - **Total Progress:** 100%
-- **Milestones Completed:** 5 / 5
-- **Tasks Completed:** 29 / 29
+- **Milestones Completed:** 7 / 7
+- **Tasks Completed:** 39 / 39
 
 ## ✅ Completed Features Log
 | Date | Feature | Phase | Milestone | Developer | Notes |
@@ -17,6 +17,8 @@
 | 2026-03-31 | Role-Based Dashboards | 1.1 | 9 | Senior AI Engineer | Built functional dashboards for Officers and Assistants. |
 | 2026-03-31 | File Preview System | 1.1 | 9 | Senior AI Engineer | Added automatic image/PDF preview in Compose sidebar. |
 | 2026-03-31 | API Book & Validation | 1.1 | 10 | AI Architect | Finalized V1.1 API Book and resolved deployment bugs. |
+| 2026-04-01 | Pickup Refinement | 1.1 | 11 | Senior AI Engineer | Enforced restrictions on pickup; rebranded 'History' to 'My Documents'. |
+| 2026-04-01 | History Restoration | 1.1 | 12 | Senior AI Engineer | Restored department-wide history for collective access. |
 
 ## 🛠️ Technical Decisions
 | Decision | Rational | Impact |

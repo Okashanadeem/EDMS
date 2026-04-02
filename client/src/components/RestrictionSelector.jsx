@@ -67,9 +67,10 @@ const RestrictionSelector = ({ isRestricted, setIsRestricted, restrictedTo, setR
             {filteredUsers.map(user => (
               <button
                 key={user.id}
+                type="button"
                 onClick={() => setRestrictedTo(user.id)}
                 className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                  restrictedTo === user.id ? 'bg-amber-50 text-amber-700 font-bold' : 'hover:bg-slate-50 text-slate-600'
+                  Number(restrictedTo) === Number(user.id) ? 'bg-amber-50 text-amber-700 font-bold' : 'hover:bg-slate-50 text-slate-600'
                 }`}
               >
                 {user.name} ({user.department_name || 'No Dept'})

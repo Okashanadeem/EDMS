@@ -14,10 +14,12 @@ const login = async (email, password) => {
     SELECT 
       u.id, u.name, u.email, u.password_hash, u.role, u.department_id, 
       d.name as department_name, u.officer_id, off.name as officer_name,
-      u.can_send_on_behalf
+      off.position_id as officer_position_id,
+      u.can_send_on_behalf, u.position_id, p.title as position_title
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     LEFT JOIN users off ON u.officer_id = off.id
+    LEFT JOIN positions p ON u.position_id = p.id
     WHERE u.email = $1 AND u.is_active = TRUE
   `;
   
@@ -39,37 +41,34 @@ const login = async (email, password) => {
       role: user.role, 
       department_id: user.department_id,
       officer_id: user.officer_id,
-      can_send_on_behalf: user.can_send_on_behalf
+      officer_position_id: user.officer_position_id,
+      can_send_on_behalf: user.can_send_on_behalf,
+      position_id: user.position_id,
+      position_title: user.position_title
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
   );
 
-  // Remove password hash from user object
+  // Remove password before returning
   delete user.password_hash;
 
   return { accessToken, user };
 };
 
 /**
- * Changes a user's password after verifying the current one.
+ * Updates a user's password.
  */
-const changePassword = async (userId, currentPassword, newPassword) => {
-  // 1. Fetch user
-  const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1 AND is_active = TRUE', [userId]);
-  const user = userResult.rows[0];
+const changePassword = async (userId, oldPassword, newPassword) => {
+  const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+  const user = result.rows[0];
 
-  if (!user) {
-    throw new Error('User not found or inactive.');
-  }
+  if (!user) throw new Error('User not found.');
 
-  // 2. Verify current password
-  const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
-  if (!isMatch) {
-    throw new Error('Current password does not match.');
-  }
+  const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+  if (!isMatch) throw new Error('Current password incorrect.');
 
-  // 3. Hash new password and update
+  // Hash new password and update
   const newHash = await bcrypt.hash(newPassword, 10);
   await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
 

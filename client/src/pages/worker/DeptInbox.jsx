@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Inbox, 
   ArrowRight, 
@@ -9,11 +10,13 @@ import {
   Hash, 
   AlertTriangle,
   RefreshCw,
-  Search
+  Search,
+  ShieldCheck
 } from 'lucide-react';
 
 const DeptInbox = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,8 +60,8 @@ const DeptInbox = () => {
 
   const filteredDocuments = documents.filter(doc => 
     doc.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.outward_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.sender_department_name.toLowerCase().includes(searchQuery.toLowerCase())
+    (doc.outward_number?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (doc.sender_department_name?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -116,11 +119,18 @@ const DeptInbox = () => {
             <div key={doc.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100 flex flex-col">
               <div className="p-5 flex-1">
                 <div className="flex justify-between items-start mb-3">
-                  <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider border border-blue-100">
-                    {doc.outward_number}
-                  </span>
-                  <span className="flex items-center text-xs text-gray-500">
-                    <Calendar size={12} className="mr-1" />
+                  <div className="flex flex-col gap-1">
+                    <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider border border-blue-100 w-fit">
+                      OUT: {doc.outward_number || 'PENDING'}
+                    </span>
+                    {doc.inward_number && (
+                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider border border-emerald-100 w-fit">
+                        IN: {doc.inward_number}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex items-center text-[10px] font-bold text-gray-400 uppercase">
+                    <Calendar size={12} className="mr-1 opacity-50" />
                     {new Date(doc.created_at).toLocaleDateString()}
                   </span>
                 </div>
@@ -129,27 +139,47 @@ const DeptInbox = () => {
                   {doc.subject}
                 </h3>
                 
+                {doc.is_restricted && (
+                  <span className="flex items-center text-[10px] font-black bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 w-fit mt-2">
+                    <ShieldCheck size={12} className="mr-1" /> RESTRICTED
+                  </span>
+                )}
+                
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center text-sm text-gray-600">
                     <ArrowRight size={14} className="mr-2 text-gray-400" />
                     <span className="font-medium">From:</span>
-                    <span className="ml-1 text-gray-800">{doc.sender_department_name}</span>
+                    <span className="ml-1 text-indigo-700 font-bold">{doc.sender_department_name}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <User size={14} className="mr-2 text-gray-400" />
                     <span className="font-medium">By:</span>
-                    <span className="ml-1 text-gray-800">{doc.sender_name}</span>
+                    <span className="ml-1 text-slate-800 font-bold">{doc.sender_name}</span>
                   </div>
                 </div>
               </div>
               
               <div className="bg-gray-50 p-4 border-t border-gray-100">
-                <button
-                  onClick={() => handlePickup(doc.id)}
-                  className="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center shadow-sm"
-                >
-                  Pick Up Document
-                </button>
+                {(() => {
+                  const isRestrictedForMe = doc.is_restricted && doc.restricted_to_user_id !== user?.id;
+                  return (
+                    <button
+                      onClick={() => !isRestrictedForMe && handlePickup(doc.id)}
+                      disabled={isRestrictedForMe}
+                      className={`w-full font-bold py-2 rounded-lg transition-colors flex items-center justify-center shadow-sm ${
+                        isRestrictedForMe 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      }`}
+                    >
+                      {isRestrictedForMe ? (
+                        <span className="flex items-center">
+                          <ShieldCheck size={16} className="mr-2" /> Restricted
+                        </span>
+                      ) : 'Pick Up Document'}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           ))}

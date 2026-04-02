@@ -1,6 +1,44 @@
 const userService = require('./users.service');
 
 /**
+ * Handles listing all positions.
+ */
+const listPositions = async (req, res) => {
+  const { department_id, role } = req.query;
+  try {
+    const data = await userService.listPositions({ departmentId: department_id, role });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch positions.' });
+  }
+};
+
+/**
+ * Handles creating a new position.
+ */
+const createPosition = async (req, res) => {
+  try {
+    const data = await userService.createPosition(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to create position.' });
+  }
+};
+
+/**
+ * Handles updating a position.
+ */
+const updatePosition = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const data = await userService.updatePosition(id, req.body);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update position.' });
+  }
+};
+
+/**
  * Handles listing all users. Supports filtering by department_id and role.
  */
 const listUsers = async (req, res) => {
@@ -17,10 +55,10 @@ const listUsers = async (req, res) => {
  * Handles creating a new user (worker, officer, assistant).
  */
 const createUser = async (req, res) => {
-  const { name, email, role, department_id, officer_id, can_send_on_behalf } = req.body;
+  const { name, email, role, department_id, officer_id, can_send_on_behalf, position_id } = req.body;
 
-  if (!name || !email || !department_id) {
-    return res.status(400).json({ success: false, error: 'Name, email, and department_id are required.' });
+  if (!name || !email || (!department_id && !position_id)) {
+    return res.status(400).json({ success: false, error: 'Name, email, and either department_id or position_id are required.' });
   }
 
   try {
@@ -30,7 +68,8 @@ const createUser = async (req, res) => {
       role, 
       department_id, 
       officer_id, 
-      can_send_on_behalf 
+      can_send_on_behalf,
+      position_id
     });
     res.status(201).json({ success: true, ...data });
   } catch (error) {
@@ -60,6 +99,28 @@ const updateUser = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update user.' });
+  }
+};
+
+/**
+ * Handles updating a user's own profile.
+ */
+const updateProfile = async (req, res) => {
+  const { id } = req.user;
+  const { can_send_on_behalf } = req.body;
+
+  if (can_send_on_behalf === undefined) {
+    return res.status(400).json({ success: false, error: 'Missing field: can_send_on_behalf' });
+  }
+
+  try {
+    const data = await userService.updateUser(id, { can_send_on_behalf });
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update profile.' });
   }
 };
 
@@ -98,9 +159,13 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
+  listPositions,
+  createPosition,
+  updatePosition,
   listUsers,
   createUser,
   updateUser,
+  updateProfile,
   resetPassword,
   deleteUser
 };

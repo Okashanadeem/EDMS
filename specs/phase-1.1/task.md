@@ -39,3 +39,17 @@
 56. [x] Ensure restricted documents are inaccessible to unauthorized users.
 57. [x] Create `Doc/V1.1/API_BOOK.md` with visual examples.
 58. [x] Final Project Review for Phase 1.1.
+
+## 🧩 Milestone 11: Pickup Refinement & Workspace
+59. [x] Update `pickupDocument` in `documents.service.js` to enforce `is_restricted` at the database level.
+60. [x] Rebrand "History" to "My Documents" in `WorkerLayout`, `OfficerLayout`, and `AssistantLayout`.
+61. [x] Update `DeptInbox.jsx` to disable "Pick Up" for unauthorized restricted documents.
+62. [x] Update `CorrespondenceHistory.jsx` to reflect the "My Documents" branding and focus.
+63. [x] Verify atomic pickup for CC/BCC recipients (Inward Number generation per department).
+
+## 🧩 Milestone 12: Department History Restoration
+64. [x] Implement `getDepartmentHistory` in `documents.service.js`.
+65. [x] Create `GET /api/v1/documents/department` endpoint.
+66. [x] Create `DepartmentHistory.jsx` component for universal department view.
+67. [x] Add "History" link to `WorkerLayout`, `OfficerLayout`, and `AssistantLayout`.
+68. [x] Register routes for `/history` in `App.jsx`.

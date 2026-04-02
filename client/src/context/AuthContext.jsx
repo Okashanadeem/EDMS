@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    setUser, // Added to allow updating user data locally
     token,
     loading,
     login,

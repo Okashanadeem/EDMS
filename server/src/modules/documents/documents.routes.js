@@ -67,4 +67,10 @@ router.post('/:id/complete', authMiddleware, rbacMiddleware('worker', 'officer')
  */
 router.post('/:id/forward', authMiddleware, rbacMiddleware('worker', 'officer'), documentController.forwardDocument);
 
+/**
+ * @route GET /api/v1/documents/department
+ * @access worker, officer, assistant
+ */
+router.get('/department', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getDepartmentHistory);
+
 module.exports = router;

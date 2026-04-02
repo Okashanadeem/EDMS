@@ -67,7 +67,9 @@ const AssistantDashboard = () => {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-extrabold text-indigo-950 tracking-tight">Assistant Dashboard</h2>
+          <h2 className="text-3xl font-extrabold text-indigo-950 tracking-tight">
+            {user?.position_title || 'Assistant Dashboard'}
+          </h2>
           <p className="text-slate-500 mt-1">Operational support for <strong>{user?.officer_name || 'Assigned Officer'}</strong>.</p>
         </div>
         <Link 

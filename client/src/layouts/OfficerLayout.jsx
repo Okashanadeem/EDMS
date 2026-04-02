@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   ShieldCheck,
-  ClipboardList
+  ClipboardList,
+  History as HistoryIcon
 } from 'lucide-react';
 
 const OfficerLayout = () => {
@@ -29,11 +30,11 @@ const OfficerLayout = () => {
   const navItems = [
     { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/officer/dashboard' },
     { label: 'Compose', icon: <PlusCircle size={20} />, path: '/officer/compose' },
-    { label: 'Drafts & Review', icon: <FileEdit size={20} />, path: '/officer/drafts' },
+    { label: 'Drafts', icon: <FileText size={20} />, path: '/officer/drafts' },
     { label: 'Department Inbox', icon: <Inbox size={20} />, path: '/officer/inbox' },
-    { label: 'My Documents', icon: <FileText size={20} />, path: '/officer/my-documents' },
-  ];
-
+    { label: 'My Documents', icon: <HistoryIcon size={20} />, path: '/officer/my-documents' },
+    { label: 'History', icon: <ClipboardList size={20} />, path: '/officer/history' },
+    ];
   return (
     <div className="min-h-screen bg-gray-100 flex">
       {/* Sidebar */}
