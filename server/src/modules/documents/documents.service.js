@@ -1,6 +1,6 @@
 const db = require('../../config/db');
 const generateNumber = require('../../utils/numbering');
-const auditLog = require('../../utils/auditLogger');
+const { auditLog } = require('../../utils/auditLogger');
 
 /**
  * Creates and dispatches a document.
@@ -112,9 +112,14 @@ const applyRestriction = (doc, userId, role) => {
  */
 const getInbox = async (departmentId, userId, role) => {
   const query = `
-    SELECT DISTINCT d.*, u.name as creator_name, sd.name as sender_department_name
+    SELECT DISTINCT 
+      d.*, 
+      u.name as creator_name, 
+      COALESCE(off.name, u.name) as sender_name,
+      sd.name as sender_department_name
     FROM documents d
     JOIN users u ON d.created_by = u.id
+    LEFT JOIN users off ON d.behalf_of_officer_id = off.id
     JOIN departments sd ON d.sender_department_id = sd.id
     LEFT JOIN document_recipients dr ON d.id = dr.document_id
     WHERE (d.receiver_department_id = $1 OR dr.department_id = $1)
@@ -135,11 +140,25 @@ const pickupDocument = async (id, workerId, departmentId) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Atomic update to claim ownership
+    // 1. Check for restriction
+    const checkQuery = 'SELECT is_restricted, restricted_to_user_id FROM documents WHERE id = $1';
+    const checkResult = await client.query(checkQuery, [id]);
+    const doc = checkResult.rows[0];
+
+    if (doc && doc.is_restricted && doc.restricted_to_user_id && doc.restricted_to_user_id !== parseInt(workerId)) {
+      const error = new Error('FORBIDDEN');
+      error.status = 403;
+      throw error;
+    }
+
+    // 2. Atomic update to claim ownership
     const pickupQuery = `
       UPDATE documents
       SET assigned_to = $1, status = 'picked_up', picked_up_at = NOW(), updated_at = NOW()
-      WHERE id = $2 AND assigned_to IS NULL AND status = 'in_transit' AND receiver_department_id = $3
+      WHERE id = $2 
+        AND assigned_to IS NULL 
+        AND status = 'in_transit' 
+        AND (receiver_department_id = $3 OR id IN (SELECT document_id FROM document_recipients WHERE department_id = $3))
       RETURNING *
     `;
     const pickupResult = await client.query(pickupQuery, [workerId, id, departmentId]);
@@ -150,10 +169,10 @@ const pickupDocument = async (id, workerId, departmentId) => {
     
     const document = pickupResult.rows[0];
 
-    // 2. Generate Inward Number
+    // 3. Generate Inward Number
     const inwardNumber = await generateNumber(departmentId, 'inward', client);
     
-    // 3. Update document with inward number
+    // 4. Update document with inward number
     const updateInwardQuery = 'UPDATE documents SET inward_number = $1 WHERE id = $2 RETURNING *';
     const finalResult = await client.query(updateInwardQuery, [inwardNumber, id]);
     const finalDoc = finalResult.rows[0];
@@ -306,6 +325,7 @@ const getMyDocuments = async (userId, departmentId, role) => {
     LEFT JOIN document_recipients dr ON d.id = dr.document_id
     WHERE d.assigned_to = $1 
        OR d.created_by = $1 
+       OR d.draft_submitted_by = $1
        OR (dr.department_id = $2 AND dr.recipient_type = 'cc')
     ORDER BY d.updated_at DESC
   `;
@@ -316,7 +336,7 @@ const getMyDocuments = async (userId, departmentId, role) => {
 /**
  * Lists all documents system-wide (Super Admin).
  */
-const listAllDocuments = async ({ department_id, status, assigned_to }, userId, role) => {
+const listAllDocuments = async ({ department_id, status, assigned_to, q }, userId, role) => {
   let query = `
     SELECT d.*, u.name as creator_name, sd.name as sender_department_name, rd.name as receiver_department_name, au.name as assignee_name
     FROM documents d
@@ -341,6 +361,11 @@ const listAllDocuments = async ({ department_id, status, assigned_to }, userId, 
   if (assigned_to) {
     query += ` AND d.assigned_to = $${counter++}`;
     params.push(assigned_to);
+  }
+  if (q) {
+    query += ` AND (d.subject ILIKE $${counter} OR d.outward_number ILIKE $${counter} OR d.inward_number ILIKE $${counter})`;
+    params.push(`%${q}%`);
+    counter++;
   }
 
   query += ' ORDER BY d.created_at DESC';
@@ -427,6 +452,31 @@ const getDocumentDetail = async (id, userId, role, userDeptId) => {
   return document;
 };
 
+/**
+ * Lists all documents where the department is sender, receiver, or CC/BCC.
+ */
+const getDepartmentHistory = async (departmentId, userId, role) => {
+  const query = `
+    SELECT DISTINCT 
+      d.*, 
+      u.name as creator_name, 
+      sd.name as sender_department_name, 
+      rd.name as receiver_department_name,
+      au.name as assignee_name
+    FROM documents d
+    JOIN users u ON d.created_by = u.id
+    JOIN departments sd ON d.sender_department_id = sd.id
+    JOIN departments rd ON d.receiver_department_id = rd.id
+    LEFT JOIN document_recipients dr ON d.id = dr.document_id
+    LEFT JOIN users au ON d.assigned_to = au.id
+    WHERE (d.sender_department_id = $1 OR d.receiver_department_id = $1 OR dr.department_id = $1)
+      AND d.status != 'draft'
+    ORDER BY d.updated_at DESC
+  `;
+  const result = await db.query(query, [departmentId]);
+  return result.rows.map(doc => applyRestriction(doc, userId, role));
+};
+
 module.exports = {
   createDocument,
   getInbox,
@@ -435,6 +485,7 @@ module.exports = {
   completeDocument,
   forwardDocument,
   getMyDocuments,
+  getDepartmentHistory,
   listAllDocuments,
   getDocumentDetail
 };

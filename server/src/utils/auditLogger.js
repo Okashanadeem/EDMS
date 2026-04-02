@@ -24,4 +24,6 @@ const auditLog = async ({ actorId, action, entityType, entityId, metadata, clien
   return result.rows[0];
 };
 
-module.exports = auditLog;
+module.exports = {
+  auditLog
+};

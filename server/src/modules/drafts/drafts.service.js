@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const auditLog = require('../../utils/auditLogger');
+const { auditLog } = require('../../utils/auditLogger');
 const generateNumber = require('../../utils/numbering');
 
 /**
@@ -8,6 +8,10 @@ const generateNumber = require('../../utils/numbering');
  * Officers see their own drafts AND drafts submitted to them.
  */
 const listDrafts = async (userId, role) => {
+  // Get user's position_id for thorough filtering
+  const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [userId]);
+  const userPosId = userRes.rows[0]?.position_id;
+
   let query = `
     SELECT d.*, u.name as creator_name, off.name as officer_name, sub.name as submitter_name
     FROM documents d
@@ -19,8 +23,13 @@ const listDrafts = async (userId, role) => {
   const params = [];
 
   if (role === 'officer') {
-    query += ' AND (d.created_by = $1 OR d.behalf_of_officer_id = $1)';
+    query += ' AND (d.created_by = $1 OR d.behalf_of_officer_id = $1';
     params.push(userId);
+    if (userPosId) {
+      query += ` OR d.behalf_of_position_id = $${params.length + 1}`;
+      params.push(userPosId);
+    }
+    query += ')';
   } else {
     query += ' AND d.created_by = $1';
     params.push(userId);
@@ -28,7 +37,25 @@ const listDrafts = async (userId, role) => {
 
   query += ' ORDER BY d.updated_at DESC';
   const result = await db.query(query, params);
-  return result.rows;
+  const drafts = result.rows;
+
+  // Enrich with CC, BCC, and References
+  for (const draft of drafts) {
+    const recipients = await db.query(
+      'SELECT dr.*, d.name as department_name FROM document_recipients dr JOIN departments d ON dr.department_id = d.id WHERE dr.document_id = $1',
+      [draft.id]
+    );
+    draft.cc = recipients.rows.filter(r => r.recipient_type === 'cc').map(r => r.department_id);
+    draft.bcc = recipients.rows.filter(r => r.recipient_type === 'bcc').map(r => r.department_id);
+
+    const refs = await db.query(
+      'SELECT r.id, r.subject, r.outward_number FROM document_references dr JOIN documents r ON dr.reference_id = r.id WHERE dr.document_id = $1',
+      [draft.id]
+    );
+    draft.references = refs.rows;
+  }
+
+  return drafts;
 };
 
 /**
@@ -38,7 +65,7 @@ const createDraft = async (userId, deptId, data) => {
   const { 
     subject, body_html, receiver_department_id, 
     cc, bcc, references, is_restricted, restricted_to_user_id,
-    behalf_of_officer_id 
+    behalf_of_officer_id, behalf_of_position_id 
   } = data;
 
   const client = await db.pool.connect();
@@ -49,14 +76,16 @@ const createDraft = async (userId, deptId, data) => {
       INSERT INTO documents (
         subject, body_html, status, created_by, 
         sender_department_id, receiver_department_id,
-        behalf_of_officer_id, is_restricted, restricted_to_user_id
+        behalf_of_officer_id, behalf_of_position_id, 
+        is_restricted, restricted_to_user_id
       )
-      VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
     const result = await client.query(query, [
       subject, body_html, userId, deptId, receiver_department_id,
-      behalf_of_officer_id || null, is_restricted || false, restricted_to_user_id || null
+      behalf_of_officer_id || null, behalf_of_position_id || null,
+      is_restricted || false, restricted_to_user_id || null
     ]);
 
     const draft = result.rows[0];
@@ -111,11 +140,11 @@ const createDraft = async (userId, deptId, data) => {
 /**
  * Updates an existing draft.
  */
-const updateDraft = async (draftId, userId, data) => {
+const updateDraft = async (draftId, userId, data, role) => {
   const { 
     subject, body_html, receiver_department_id, 
     cc, bcc, references, is_restricted, restricted_to_user_id,
-    draft_revision_note 
+    draft_revision_note, file_path
   } = data;
 
   const client = await db.pool.connect();
@@ -123,13 +152,16 @@ const updateDraft = async (draftId, userId, data) => {
     await client.query('BEGIN');
 
     // Verify ownership or officer relationship
-    const checkQuery = 'SELECT created_by, behalf_of_officer_id FROM documents WHERE id = $1 AND status = \'draft\'';
+    const checkQuery = 'SELECT created_by, behalf_of_officer_id, draft_submitted_at, draft_revision_note FROM documents WHERE id = $1 AND status = \'draft\'';
     const checkResult = await client.query(checkQuery, [draftId]);
     const existing = checkResult.rows[0];
 
     if (!existing) throw new Error('Draft not found.');
-    // Officers can only update the revision note if they are the target officer
-    // But usually creators update the content.
+
+    // Edit Restriction: Assistant can only edit if not submitted OR if revision note is present
+    if (role === 'assistant' && existing.draft_submitted_at && !existing.draft_revision_note) {
+      throw new Error('Draft is currently under review and cannot be edited.');
+    }
     
     const query = `
       UPDATE documents 
@@ -139,13 +171,19 @@ const updateDraft = async (draftId, userId, data) => {
           is_restricted = COALESCE($4, is_restricted),
           restricted_to_user_id = COALESCE($5, restricted_to_user_id),
           draft_revision_note = COALESCE($6, draft_revision_note),
+          behalf_of_officer_id = COALESCE($7, behalf_of_officer_id),
+          behalf_of_position_id = COALESCE($8, behalf_of_position_id),
+          file_path = COALESCE($9, file_path),
           updated_at = NOW()
-      WHERE id = $7 AND status = 'draft'
+      WHERE id = $10 AND status = 'draft'
       RETURNING *
     `;
     const result = await client.query(query, [
       subject, body_html, receiver_department_id, 
-      is_restricted, restricted_to_user_id, draft_revision_note, draftId
+      is_restricted, restricted_to_user_id, draft_revision_note,
+      data.behalf_of_officer_id || null, data.behalf_of_position_id || null,
+      file_path !== undefined ? file_path : null,
+      draftId
     ]);
     const draft = result.rows[0];
 
@@ -210,7 +248,7 @@ const submitDraft = async (draftId, userId) => {
     SET draft_submitted_by = $1, 
         draft_submitted_at = NOW(),
         updated_at = NOW()
-    WHERE id = $2 AND status = 'draft' AND behalf_of_officer_id IS NOT NULL
+    WHERE id = $2 AND status = 'draft' AND (behalf_of_officer_id IS NOT NULL OR behalf_of_position_id IS NOT NULL)
     RETURNING *
   `;
   const result = await db.query(query, [userId, draftId]);
@@ -233,13 +271,23 @@ const submitDraft = async (draftId, userId) => {
  * Officer approves and dispatches a draft.
  */
 const approveDraft = async (draftId, officerId) => {
+  const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [officerId]);
+  const userPosId = userRes.rows[0]?.position_id;
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Verify eligibility
-    const checkQuery = 'SELECT * FROM documents WHERE id = $1 AND status = \'draft\' AND behalf_of_officer_id = $2';
-    const checkResult = await client.query(checkQuery, [draftId, officerId]);
+    // 1. Verify eligibility (User ID or Position ID)
+    let checkQuery = 'SELECT * FROM documents WHERE id = $1 AND status = \'draft\' AND (behalf_of_officer_id = $2';
+    const checkParams = [draftId, officerId];
+    if (userPosId) {
+      checkQuery += ' OR behalf_of_position_id = $3';
+      checkParams.push(userPosId);
+    }
+    checkQuery += ')';
+
+    const checkResult = await client.query(checkQuery, checkParams);
     const draft = checkResult.rows[0];
 
     if (!draft) throw new Error('Draft not found or unauthorized.');
@@ -283,14 +331,23 @@ const approveDraft = async (draftId, officerId) => {
  * Officer requests revisions.
  */
 const reviseDraft = async (draftId, officerId, note) => {
-  const query = `
+  const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [officerId]);
+  const userPosId = userRes.rows[0]?.position_id;
+
+  let query = `
     UPDATE documents 
     SET draft_revision_note = $1,
         updated_at = NOW()
-    WHERE id = $2 AND status = 'draft' AND behalf_of_officer_id = $3
-    RETURNING *
+    WHERE id = $2 AND status = 'draft' AND (behalf_of_officer_id = $3
   `;
-  const result = await db.query(query, [note, draftId, officerId]);
+  const params = [note, draftId, officerId];
+  if (userPosId) {
+    query += ' OR behalf_of_position_id = $4';
+    params.push(userPosId);
+  }
+  query += ') RETURNING *';
+
+  const result = await db.query(query, params);
   const draft = result.rows[0];
 
   if (!draft) throw new Error('Draft not found or unauthorized.');

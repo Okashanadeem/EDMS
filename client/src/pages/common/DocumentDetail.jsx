@@ -33,10 +33,10 @@ const DocumentDetail = () => {
     try {
       setLoading(true);
       const response = await api.get(`/documents/${id}`);
-      setDocument(response.data);
+      setDocument(response.data.data);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch document details');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to fetch document details');
     } finally {
       setLoading(false);
     }

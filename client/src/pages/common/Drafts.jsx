@@ -29,6 +29,17 @@ const Drafts = () => {
     fetchDrafts();
   }, []);
 
+  useEffect(() => {
+    if (user?.role === 'officer' && drafts.length > 0) {
+      const hasReviewDrafts = drafts.some(d => 
+        (Number(d.behalf_of_officer_id) === Number(user.id) || 
+         (d.behalf_of_position_id && Number(d.behalf_of_position_id) === Number(user.position_id))) 
+        && d.draft_submitted_at
+      );
+      if (hasReviewDrafts) setActiveTab('review');
+    }
+  }, [drafts, user]);
+
   const fetchDrafts = async () => {
     setLoading(true);
     try {
@@ -57,10 +68,10 @@ const Drafts = () => {
     if (!selectedDraft) return;
     setActionLoading(true);
     try {
-      await api.post(`/drafts/${selectedDraft.id}/approve`);
-      alert('Draft approved and dispatched!');
-      fetchDrafts();
-      setSelectedDraft(null);
+      const response = await api.post(`/drafts/${selectedDraft.id}/approve`);
+      // The backend approveDraft returns finalDoc which includes the ID
+      const finalDoc = response.data.data;
+      navigate(`/${rolePath}/document/${finalDoc.id}`);
     } catch (err) {
       alert(err.response?.data?.error || 'Approval failed');
     } finally {
@@ -83,8 +94,12 @@ const Drafts = () => {
     }
   };
 
-  const myDrafts = drafts.filter(d => d.created_by === user.id);
-  const submittedDrafts = drafts.filter(d => d.behalf_of_officer_id === user.id && d.draft_submitted_at);
+  const myDrafts = drafts.filter(d => Number(d.created_by) === Number(user.id));
+  const submittedDrafts = drafts.filter(d => 
+    (Number(d.behalf_of_officer_id) === Number(user.id) || 
+     (d.behalf_of_position_id && Number(d.behalf_of_position_id) === Number(user.position_id))) 
+    && d.draft_submitted_at
+  );
 
   const displayDrafts = activeTab === 'mine' ? myDrafts : submittedDrafts;
 
@@ -158,14 +173,16 @@ const Drafts = () => {
                         {status.label}
                       </span>
                       <div className="flex gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); navigate(`/${rolePath}/compose/${draft.id}`); }}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                          title="Edit Content"
-                        >
-                          <FileEdit size={16} />
-                        </button>
-                        {draft.created_by === user.id && (
+                        {!(user.role === 'assistant' && draft.draft_submitted_at && !draft.draft_revision_note) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/${rolePath}/compose/${draft.id}`); }}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title="Edit Content"
+                          >
+                            <FileEdit size={16} />
+                          </button>
+                        )}
+                        {draft.created_by === user.id && !(user.role === 'assistant' && draft.draft_submitted_at && !draft.draft_revision_note) && (
                           <button
                             onClick={(e) => handleDelete(draft.id, e)}
                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"

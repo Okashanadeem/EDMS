@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Inbox, 
   FileText, 
@@ -11,12 +12,16 @@ import {
   TrendingUp,
   FileEdit,
   ShieldCheck,
-  History as HistoryIcon
+  History as HistoryIcon,
+  ToggleLeft,
+  ToggleRight,
+  RefreshCw
 } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 
 const OfficerDashboard = () => {
   const navigate = useNavigate();
+  const { user, setUser } = useAuth();
   const [stats, setStats] = useState({
     inbox_count: 0,
     draft_review_count: 0,
@@ -24,6 +29,8 @@ const OfficerDashboard = () => {
     recent_docs: []
   });
   const [loading, setLoading] = useState(true);
+  const [canSendOnBehalf, setCanSendOnBehalf] = useState(user?.can_send_on_behalf || false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -55,6 +62,25 @@ const OfficerDashboard = () => {
     }
   };
 
+  const handleToggleDelegation = async () => {
+    try {
+      setUpdatingProfile(true);
+      const newVal = !canSendOnBehalf;
+      const response = await api.patch('/users/profile', { can_send_on_behalf: newVal });
+      const updatedUser = response.data.data;
+      
+      setCanSendOnBehalf(newVal);
+      
+      // Update AuthContext and Local Storage
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (err) {
+      console.error('Failed to update delegation status');
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
   const statCards = [
     { label: 'Dept Inbox', value: stats.inbox_count, icon: <Inbox size={24} />, color: 'bg-blue-500', path: '/officer/inbox', desc: 'Unclaimed' },
     { label: 'Pending Review', value: stats.draft_review_count, icon: <FileEdit size={24} />, color: 'bg-indigo-500', path: '/officer/drafts', desc: 'Assistant drafts' },
@@ -65,16 +91,37 @@ const OfficerDashboard = () => {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600">Officer Dashboard</h2>
-          <p className="text-slate-500 mt-1">Correspondence review and departmental management.</p>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600">
+            {user?.position_title || 'Officer Dashboard'}
+          </h2>
+          <p className="text-slate-500 mt-1">
+            {user?.name} | Correspondence review and departmental management.
+          </p>
         </div>
-        <Link 
-          to="/officer/compose"
-          className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 hover:-translate-y-0.5"
-        >
-          <PlusCircle size={20} className="mr-2" />
-          Compose Document
-        </Link>
+        <div className="flex gap-3">
+          <div className={`flex items-center px-4 py-2 rounded-xl border transition-all ${canSendOnBehalf ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="mr-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Delegated Sending</p>
+              <p className={`text-xs font-bold ${canSendOnBehalf ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {canSendOnBehalf ? 'ENABLED' : 'DISABLED'}
+              </p>
+            </div>
+            <button 
+              disabled={updatingProfile}
+              onClick={handleToggleDelegation}
+              className={`p-2 rounded-lg transition-all ${canSendOnBehalf ? 'text-emerald-600 hover:bg-emerald-100' : 'text-slate-400 hover:bg-slate-200'}`}
+            >
+              {updatingProfile ? <RefreshCw size={20} className="animate-spin" /> : canSendOnBehalf ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+            </button>
+          </div>
+          <Link 
+            to="/officer/compose"
+            className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 hover:-translate-y-0.5"
+          >
+            <PlusCircle size={20} className="mr-2" />
+            Compose
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

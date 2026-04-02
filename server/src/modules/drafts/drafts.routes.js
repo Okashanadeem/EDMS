@@ -1,9 +1,11 @@
 const express = require('express');
+const multer = require('multer');
 const draftController = require('./drafts.controller');
 const authMiddleware = require('../../middleware/auth');
 const rbacMiddleware = require('../../middleware/rbac');
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 /**
  * @route GET /api/v1/drafts
@@ -15,13 +17,13 @@ router.get('/', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant')
  * @route POST /api/v1/drafts
  * @access worker, officer, assistant
  */
-router.post('/', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), draftController.createDraft);
+router.post('/', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), upload.single('file'), draftController.createDraft);
 
 /**
  * @route PATCH /api/v1/drafts/:id
  * @access worker, officer, assistant
  */
-router.patch('/:id', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), draftController.updateDraft);
+router.patch('/:id', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), upload.single('file'), draftController.updateDraft);
 
 /**
  * @route DELETE /api/v1/drafts/:id

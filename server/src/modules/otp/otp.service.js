@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../../config/db');
 const { sendOtp } = require('../../utils/mailer');
-const auditLogger = require('../../utils/auditLogger');
+const { auditLog } = require('../../utils/auditLogger');
 const { generateNumber } = require('../../utils/numbering');
 
 /**
@@ -44,7 +44,7 @@ const requestOtp = async (documentId, assistantId) => {
     await sendOtp(doc.officer_email, doc.officer_name, otpCode, doc.subject);
 
     // 6. Audit Log
-    await auditLogger.auditLog({
+    await auditLog({
       actorId: assistantId,
       action: 'otp.requested',
       entityType: 'document',
@@ -108,7 +108,7 @@ const verifyOtp = async (documentId, assistantId, otpCode) => {
     const finalResult = await client.query(updateDocQuery, [outwardNumber, documentId]);
 
     // 5. Audit Log
-    await auditLogger.auditLog({
+    await auditLog({
       actorId: assistantId,
       action: 'otp.verified',
       entityType: 'document',
@@ -117,7 +117,7 @@ const verifyOtp = async (documentId, assistantId, otpCode) => {
       client
     });
 
-    await auditLogger.auditLog({
+    await auditLog({
       actorId: assistantId,
       action: 'document.sent_on_behalf',
       entityType: 'document',

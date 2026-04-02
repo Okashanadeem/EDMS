@@ -6,7 +6,7 @@ import {
   LayoutDashboard, 
   Building2, 
   Users, 
-  Files, 
+  FileText, 
   History, 
   LogOut,
   Menu,
@@ -29,7 +29,7 @@ const SuperAdminLayout = () => {
     { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/admin/dashboard' },
     { label: 'Departments', icon: <Building2 size={20} />, path: '/admin/departments' },
     { label: 'Users', icon: <Users size={20} />, path: '/admin/users' },
-    { label: 'All Documents', icon: <Files size={20} />, path: '/admin/documents' },
+    { label: 'Correspondence', icon: <FileText size={20} />, path: '/admin/documents' },
     { label: 'Audit Log', icon: <History size={20} />, path: '/admin/audit' },
   ];
 
@@ -42,7 +42,7 @@ const SuperAdminLayout = () => {
         } bg-slate-900 text-white transition-all duration-300 flex flex-col`}
       >
         <div className="p-4 flex items-center justify-between">
-          {isSidebarOpen && <span className="font-bold text-xl tracking-wider">EDMS ADMIN</span>}
+          {isSidebarOpen && <span className="font-bold text-xl tracking-wider uppercase">Admin</span>}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-1 hover:bg-slate-800 rounded"
@@ -90,8 +90,8 @@ const SuperAdminLayout = () => {
             Welcome, {user?.name}
           </h1>
           <div className="flex items-center space-x-4">
-            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-              Super Admin
+            <span className="bg-blue-50 text-blue-800 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border border-blue-100">
+              System Admin
             </span>
           </div>
         </header>

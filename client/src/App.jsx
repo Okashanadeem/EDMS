@@ -26,7 +26,8 @@ import WorkerDashboard from './pages/worker/WorkerDashboard';
 import OfficerDashboard from './pages/officer/OfficerDashboard';
 import AssistantDashboard from './pages/assistant/AssistantDashboard';
 import DeptInbox from './pages/worker/DeptInbox';
-import MyDocuments from './pages/worker/MyDocuments';
+import CorrespondenceHistory from './pages/common/CorrespondenceHistory';
+import DepartmentHistory from './pages/common/DepartmentHistory';
 
 // Basic Login Component
 const LoginPage = () => {
@@ -124,7 +125,8 @@ const App = () => {
           <Route path="/worker/compose/:id" element={<Compose />} />
           <Route path="/worker/drafts" element={<Drafts />} />
           <Route path="/worker/inbox" element={<DeptInbox />} />
-          <Route path="/worker/my-documents" element={<MyDocuments />} />
+          <Route path="/worker/my-documents" element={<CorrespondenceHistory />} />
+          <Route path="/worker/history" element={<DepartmentHistory />} />
           <Route path="/worker/document/:id" element={<DocumentDetail />} />
         </Route>
       </Route>
@@ -137,7 +139,8 @@ const App = () => {
           <Route path="/officer/compose/:id" element={<Compose />} />
           <Route path="/officer/drafts" element={<Drafts />} />
           <Route path="/officer/inbox" element={<DeptInbox role="officer" />} />
-          <Route path="/officer/my-documents" element={<MyDocuments />} />
+          <Route path="/officer/my-documents" element={<CorrespondenceHistory />} />
+          <Route path="/officer/history" element={<DepartmentHistory />} />
           <Route path="/officer/document/:id" element={<DocumentDetail />} />
         </Route>
       </Route>
@@ -150,6 +153,8 @@ const App = () => {
           <Route path="/assistant/compose/:id" element={<Compose />} />
           <Route path="/assistant/drafts" element={<Drafts />} />
           <Route path="/assistant/inbox" element={<DeptInbox role="assistant" />} />
+          <Route path="/assistant/my-documents" element={<CorrespondenceHistory />} />
+          <Route path="/assistant/history" element={<DepartmentHistory />} />
           <Route path="/assistant/document/:id" element={<DocumentDetail />} />
         </Route>
       </Route>

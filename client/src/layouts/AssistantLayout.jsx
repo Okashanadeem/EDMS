@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  History as HistoryIcon
 } from 'lucide-react';
 
 const AssistantLayout = () => {
@@ -30,6 +31,8 @@ const AssistantLayout = () => {
     { label: 'Compose', icon: <PlusCircle size={20} />, path: '/assistant/compose' },
     { label: 'My Drafts', icon: <FileEdit size={20} />, path: '/assistant/drafts' },
     { label: 'Dept Inbox', icon: <Inbox size={20} />, path: '/assistant/inbox' },
+    { label: 'My Documents', icon: <HistoryIcon size={20} />, path: '/assistant/my-documents' },
+    { label: 'History', icon: <HistoryIcon size={20} />, path: '/assistant/history' },
   ];
 
   return (

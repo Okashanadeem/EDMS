@@ -120,7 +120,12 @@ const DocumentDetail = () => {
   }
 
   const isAssigned = document.assigned_to === user?.id;
-  const canPickup = document.status === 'in_transit' && document.receiver_department_id === user?.department_id;
+  const isDeptRecipient = document.receiver_department_id === user?.department_id || 
+                         document.cc?.some(c => c.department_id === user?.department_id);
+  
+  const canPickup = document.status === 'in_transit' && 
+                    isDeptRecipient && 
+                    (!document.is_restricted || document.restricted_to_user_id === user?.id);
 
   return (
     <div className="space-y-6">
@@ -243,7 +248,7 @@ const DocumentDetail = () => {
                 <User size={18} className="text-gray-400 mr-3 mt-0.5" />
                 <div>
                   <p className="text-xs text-gray-500 font-semibold uppercase">Assigned To</p>
-                  <p className="text-sm font-bold text-gray-900">{document.assigned_worker_name || 'Unclaimed'}</p>
+                  <p className="text-sm font-bold text-gray-900">{document.assignee_name || 'Unclaimed'}</p>
                 </div>
               </div>
               <div className="flex items-start">

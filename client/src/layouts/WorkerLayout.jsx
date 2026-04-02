@@ -10,7 +10,8 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck
+  ShieldCheck,
+  History as HistoryIcon
 } from 'lucide-react';
 
 const WorkerLayout = () => {
@@ -30,6 +31,7 @@ const WorkerLayout = () => {
     { label: 'Drafts', icon: <FileText size={20} />, path: '/worker/drafts' },
     { label: 'Department Inbox', icon: <Inbox size={20} />, path: '/worker/inbox' },
     { label: 'My Documents', icon: <FileText size={20} />, path: '/worker/my-documents' },
+    { label: 'History', icon: <HistoryIcon size={20} />, path: '/worker/history' },
   ];
 
   return (

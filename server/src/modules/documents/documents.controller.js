@@ -12,6 +12,17 @@ const createDocument = async (req, res) => {
   const workerId = req.user.id;
   const senderDeptId = req.user.department_id;
 
+  // Helper to parse potential JSON string arrays from FormData
+  const parseArray = (field) => {
+    if (!field) return [];
+    if (Array.isArray(field)) return field;
+    try {
+      return JSON.parse(field);
+    } catch (e) {
+      return [field];
+    }
+  };
+
   if (!subject || !receiver_department_id) {
     return res.status(400).json({ success: false, error: 'Subject and receiver department are required.' });
   }
@@ -31,7 +42,11 @@ const createDocument = async (req, res) => {
       receiver_department_id,
       created_by: workerId,
       sender_department_id: senderDeptId,
-      cc, bcc, references, is_restricted, restricted_to_user_id
+      cc: parseArray(cc),
+      bcc: parseArray(bcc),
+      references: parseArray(references),
+      is_restricted: is_restricted === 'true' || is_restricted === true,
+      restricted_to_user_id: restricted_to_user_id === 'null' ? null : (restricted_to_user_id || null)
     });
 
     res.status(201).json({ success: true, data });
@@ -146,10 +161,10 @@ const getMyDocuments = async (req, res) => {
  * Handles system-wide document listing (Super Admin).
  */
 const listAllDocuments = async (req, res) => {
-  const { department_id, status, assigned_to } = req.query;
+  const { department_id, status, assigned_to, q } = req.query;
   try {
     const data = await documentService.listAllDocuments(
-      { department_id, status, assigned_to },
+      { department_id, status, assigned_to, q },
       req.user.id,
       req.user.role
     );
@@ -196,6 +211,22 @@ const getDocumentDetail = async (req, res) => {
   }
 };
 
+/**
+ * Handles fetching all documents related to a department.
+ */
+const getDepartmentHistory = async (req, res) => {
+  try {
+    const data = await documentService.getDepartmentHistory(
+      req.user.department_id, 
+      req.user.id, 
+      req.user.role
+    );
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch department history.' });
+  }
+};
+
 module.exports = {
   createDocument,
   getInbox,
@@ -204,6 +235,7 @@ module.exports = {
   completeDocument,
   forwardDocument,
   getMyDocuments,
+  getDepartmentHistory,
   listAllDocuments,
   getDocumentDetail
 };
