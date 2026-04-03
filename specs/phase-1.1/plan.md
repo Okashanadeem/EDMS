@@ -38,3 +38,4 @@ The primary goal of Phase 1.1 is to evolve the MVP into a production-ready, feat
 - **Step 8:** Document Pickup Refinement & Workspace Rebranding.
 - **Step 9:** Department-Wide History Restoration.
 - **Step 10:** Dynamic File Naming & Multi-POV Attachment Access.
+- **Step 11:** Granular Cleanup & API Documentation.
