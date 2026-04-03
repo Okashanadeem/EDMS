@@ -13,12 +13,11 @@ const login = async (email, password) => {
   const query = `
     SELECT 
       u.id, u.name, u.email, u.password_hash, u.role, u.department_id, 
-      d.name as department_name, u.officer_id, off.name as officer_name,
-      off.position_id as officer_position_id,
+      d.name as department_name, 
+      p.parent_id as officer_position_id,
       u.can_send_on_behalf, u.position_id, p.title as position_title
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
-    LEFT JOIN users off ON u.officer_id = off.id
     LEFT JOIN positions p ON u.position_id = p.id
     WHERE u.email = $1 AND u.is_active = TRUE
   `;
@@ -40,7 +39,6 @@ const login = async (email, password) => {
       id: user.id, 
       role: user.role, 
       department_id: user.department_id,
-      officer_id: user.officer_id,
       officer_position_id: user.officer_position_id,
       can_send_on_behalf: user.can_send_on_behalf,
       position_id: user.position_id,
@@ -55,6 +53,7 @@ const login = async (email, password) => {
 
   return { accessToken, user };
 };
+
 
 /**
  * Updates a user's password.

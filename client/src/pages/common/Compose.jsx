@@ -31,7 +31,9 @@ const Compose = () => {
   const [restrictedTo, setRestrictedTo] = useState(null);
   const [behalfOfOfficerId, setBehalfOfOfficerId] = useState(user?.officer_id || '');
   const [file, setFile] = useState(null);
+  const [stagedFile, setStagedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState(id || null);
   const [existingFile, setExistingFile] = useState(null);
@@ -42,18 +44,30 @@ const Compose = () => {
     if (id) fetchDraftDetails();
   }, [id]);
 
-  useEffect(() => {
-    if (!file) {
-      setFilePreview(null);
-      return;
-    }
-    const type = file.type;
-    if (type.startsWith('image/') || type === 'application/pdf') {
-      const objectUrl = URL.createObjectURL(file);
-      setFilePreview({ url: objectUrl, type });
-      return () => URL.revokeObjectURL(objectUrl);
-    }
-  }, [file]);
+  const handleFileSelection = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+
+    setStagedFile(selectedFile);
+    const type = selectedFile.type;
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setFilePreview({ url: objectUrl, type, name: selectedFile.name });
+    setIsAttachmentModalOpen(true);
+    
+    // Reset the input value so the same file can be selected again if cancelled
+    e.target.value = '';
+  };
+
+  const confirmAttachment = () => {
+    setFile(stagedFile);
+    setIsAttachmentModalOpen(false);
+  };
+
+  const cancelAttachment = () => {
+    setStagedFile(null);
+    setFilePreview(null);
+    setIsAttachmentModalOpen(false);
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -216,8 +230,27 @@ const Compose = () => {
     navigate(`/assistant/document/${data.id}`);
   };
 
+  const handleCancel = async () => {
+    if (!activeDraftId) {
+      // Unsaved local draft, just navigate away
+      const rolePath = user.role === 'super_admin' ? 'admin' : user.role;
+      return navigate(`/${rolePath}/dashboard`);
+    }
+
+    if (window.confirm('Are you sure you want to discard this draft? This will permanently delete the saved draft and any attachments.')) {
+      try {
+        await api.delete(`/drafts/${activeDraftId}`);
+        const rolePath = user.role === 'super_admin' ? 'admin' : user.role;
+        navigate(`/${rolePath}/dashboard`);
+      } catch (err) {
+        setError('Failed to delete draft. Please try again.');
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 max-w-[1600px] mx-auto">
+
       <div className="w-full lg:w-1/3 space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
           <div className="flex items-center justify-between">
@@ -288,7 +321,7 @@ const Compose = () => {
                   type="file" 
                   disabled={isReadOnly}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" 
-                  onChange={(e) => setFile(e.target.files[0])} 
+                  onChange={handleFileSelection} 
                 />
                 <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center group-hover:border-indigo-400">
                   {file ? (
@@ -319,14 +352,35 @@ const Compose = () => {
                 </div>
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-white p-4 flex flex-col items-center">
                    <FileText size={32} className="text-indigo-400 mb-2" />
-                   <a 
-                    href={`${import.meta.env.VITE_API_URL}/uploads/${existingFile}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                   <button 
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const response = await api.get(`/documents/${activeDraftId}/attachment`, { responseType: 'blob' });
+                        const url = window.URL.createObjectURL(new Blob([response.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        const contentDisposition = response.headers['content-disposition'];
+                        let fileName = 'attachment';
+                        if (contentDisposition) {
+                          // Handle both filename="name.ext" and filename=name.ext
+                          const fileNameMatch = contentDisposition.match(/filename=(?:"([^"]+)"|([^;]+))/);
+                          if (fileNameMatch) {
+                            fileName = fileNameMatch[1] || fileNameMatch[2];
+                          }
+                        }
+                        link.setAttribute('download', fileName);
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                      } catch (err) {
+                        alert('Failed to download attachment');
+                      }
+                    }}
                     className="text-[10px] font-bold text-indigo-600 hover:underline uppercase tracking-tighter"
                    >
-                     View File in New Tab
-                   </a>
+                     Download Saved Attachment
+                   </button>
                 </div>
               </div>
             )}
@@ -338,8 +392,15 @@ const Compose = () => {
 
         {!isReadOnly && (
           <div className="flex flex-col gap-3">
+            <button 
+              onClick={handleCancel}
+              className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold text-xs hover:bg-red-100 transition-all flex items-center justify-center border border-red-100"
+            >
+              <X size={16} className="mr-2" /> Discard / Cancel
+            </button>
             <div className="flex gap-3">
               <button onClick={() => handleAction('draft')} disabled={saveLoading} className="flex-1 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 shadow-sm flex items-center justify-center">
+
                 <Save size={18} className="mr-2" /> Save Draft
               </button>
               <button onClick={() => handleAction('dispatch')} disabled={loading} className="flex-[2] bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center justify-center">
@@ -360,6 +421,65 @@ const Compose = () => {
       </div>
 
       <OtpModal isOpen={isOtpModalOpen} onClose={() => setIsOtpModalOpen(false)} documentId={activeDraftId} onSuccess={onOtpSuccess} />
+
+      {/* Attachment Preview Modal */}
+      {isAttachmentModalOpen && (
+        <div className="fixed inset-0 z-[110] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" onClick={cancelAttachment}>
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
+            <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-8 pt-8 pb-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <div className="bg-indigo-100 p-2.5 rounded-xl text-indigo-600 mr-4">
+                      <Paperclip size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Verify Attachment</h3>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{filePreview?.name}</p>
+                    </div>
+                  </div>
+                  <button onClick={cancelAttachment} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center min-h-[300px] max-h-[500px]">
+                  {filePreview?.type.startsWith('image/') ? (
+                    <img src={filePreview.url} alt="Preview" className="max-w-full max-h-[500px] object-contain" />
+                  ) : filePreview?.type === 'application/pdf' ? (
+                    <iframe src={filePreview.url} title="PDF Preview" className="w-full h-[500px] border-none" />
+                  ) : (
+                    <div className="flex flex-col items-center py-12">
+                      <FileText size={64} className="text-slate-200 mb-4" />
+                      <p className="text-slate-500 font-bold">No visual preview available for this file type</p>
+                      <p className="text-slate-400 text-xs mt-1">You can still attach it to the document.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-slate-50 px-8 py-6 flex gap-3">
+                <button 
+                  onClick={confirmAttachment}
+                  className="flex-1 bg-indigo-600 text-white py-3.5 rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
+                  Yes, Attach File
+                </button>
+                <button 
+                  onClick={cancelAttachment}
+                  className="flex-1 bg-white text-slate-600 py-3.5 rounded-2xl font-black text-sm border border-slate-200 hover:bg-slate-100 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

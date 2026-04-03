@@ -1,43 +1,46 @@
 const db = require('../../config/db');
 const { auditLog } = require('../../utils/auditLogger');
 const generateNumber = require('../../utils/numbering');
+const { deleteFile } = require('../../utils/storage');
 
 /**
  * Lists drafts for a user.
- * Workers/Assistants see their own drafts.
- * Officers see their own drafts AND drafts submitted to them.
+ * Workers see their own drafts.
+ * Assistants see their drafts.
+ * Officers see their own drafts AND drafts submitted to their position.
  */
-const listDrafts = async (userId, role) => {
+const listDrafts = async (userId, role, page = 1, limit = 10) => {
+  const offset = (page - 1) * limit;
   // Get user's position_id for thorough filtering
   const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [userId]);
   const userPosId = userRes.rows[0]?.position_id;
 
-  let query = `
-    SELECT d.*, u.name as creator_name, off.name as officer_name, sub.name as submitter_name
-    FROM documents d
-    JOIN users u ON d.created_by = u.id
-    LEFT JOIN users off ON d.behalf_of_officer_id = off.id
-    LEFT JOIN users sub ON d.draft_submitted_by = sub.id
-    WHERE d.status = 'draft'
-  `;
+  let whereClause = "WHERE d.status = 'draft'";
   const params = [];
 
-  if (role === 'officer') {
-    query += ' AND (d.created_by = $1 OR d.behalf_of_officer_id = $1';
-    params.push(userId);
-    if (userPosId) {
-      query += ` OR d.behalf_of_position_id = $${params.length + 1}`;
-      params.push(userPosId);
-    }
-    query += ')';
+  if (role === 'officer' && userPosId) {
+    whereClause += ' AND (d.created_by = $1 OR d.behalf_of_position_id = $2)';
+    params.push(userId, userPosId);
   } else {
-    query += ' AND d.created_by = $1';
+    whereClause += ' AND d.created_by = $1';
     params.push(userId);
   }
 
-  query += ' ORDER BY d.updated_at DESC';
-  const result = await db.query(query, params);
-  const drafts = result.rows;
+  const countQuery = `SELECT COUNT(*) FROM documents d ${whereClause}`;
+  const dataQuery = `
+    SELECT d.*, u.name as creator_name, sub.name as submitter_name, p.title as behalf_of_position_title
+    FROM documents d
+    JOIN users u ON d.created_by = u.id
+    LEFT JOIN users sub ON d.draft_submitted_by = sub.id
+    LEFT JOIN positions p ON d.behalf_of_position_id = p.id
+    ${whereClause}
+    ORDER BY d.updated_at DESC
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+  `;
+
+  const countResult = await db.query(countQuery, params);
+  const dataResult = await db.query(dataQuery, [...params, limit, offset]);
+  const drafts = dataResult.rows;
 
   // Enrich with CC, BCC, and References
   for (const draft of drafts) {
@@ -55,18 +58,35 @@ const listDrafts = async (userId, role) => {
     draft.references = refs.rows;
   }
 
-  return drafts;
+  return {
+    total: parseInt(countResult.rows[0].count),
+    page: parseInt(page),
+    limit: parseInt(limit),
+    data: drafts
+  };
 };
+
 
 /**
  * Creates a new draft.
+ * Automatically links to the parent position if the creator is an assistant.
  */
 const createDraft = async (userId, deptId, data) => {
   const { 
     subject, body_html, receiver_department_id, 
-    cc, bcc, references, is_restricted, restricted_to_user_id,
-    behalf_of_officer_id, behalf_of_position_id 
+    cc, bcc, references, is_restricted, restricted_to_user_id
   } = data;
+
+  // Determine behalf_of_position_id
+  const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [userId]);
+  const userPosId = userRes.rows[0]?.position_id;
+  
+  let finalBehalfOfPos = data.behalf_of_position_id;
+  
+  if (!finalBehalfOfPos && userPosId) {
+    const posRes = await db.query('SELECT parent_id FROM positions WHERE id = $1', [userPosId]);
+    finalBehalfOfPos = posRes.rows[0]?.parent_id || null;
+  }
 
   const client = await db.pool.connect();
   try {
@@ -76,15 +96,15 @@ const createDraft = async (userId, deptId, data) => {
       INSERT INTO documents (
         subject, body_html, status, created_by, 
         sender_department_id, receiver_department_id,
-        behalf_of_officer_id, behalf_of_position_id, 
+        behalf_of_position_id, 
         is_restricted, restricted_to_user_id
       )
-      VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
     const result = await client.query(query, [
       subject, body_html, userId, deptId, receiver_department_id,
-      behalf_of_officer_id || null, behalf_of_position_id || null,
+      finalBehalfOfPos,
       is_restricted || false, restricted_to_user_id || null
     ]);
 
@@ -123,7 +143,7 @@ const createDraft = async (userId, deptId, data) => {
       action: 'draft.saved',
       entityType: 'document',
       entityId: draft.id,
-      metadata: { subject: draft.subject },
+      metadata: { subject: draft.subject, behalf_of_position_id: finalBehalfOfPos },
       client
     });
 
@@ -144,16 +164,21 @@ const updateDraft = async (draftId, userId, data, role) => {
   const { 
     subject, body_html, receiver_department_id, 
     cc, bcc, references, is_restricted, restricted_to_user_id,
-    draft_revision_note, file_path
+    draft_revision_note, file_path, behalf_of_position_id
   } = data;
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Verify ownership or officer relationship
-    const checkQuery = 'SELECT created_by, behalf_of_officer_id, draft_submitted_at, draft_revision_note FROM documents WHERE id = $1 AND status = \'draft\'';
-    const checkResult = await client.query(checkQuery, [draftId]);
+    // Verify ownership or position relationship
+    const checkQuery = `
+      SELECT d.created_by, d.behalf_of_position_id, d.draft_submitted_at, d.draft_revision_note, u.position_id
+      FROM documents d
+      JOIN users u ON u.id = $2
+      WHERE d.id = $1 AND d.status = 'draft'
+    `;
+    const checkResult = await client.query(checkQuery, [draftId, userId]);
     const existing = checkResult.rows[0];
 
     if (!existing) throw new Error('Draft not found.');
@@ -163,6 +188,11 @@ const updateDraft = async (draftId, userId, data, role) => {
       throw new Error('Draft is currently under review and cannot be edited.');
     }
     
+    // Auth Check: Must be creator OR hold the target position
+    if (existing.created_by !== userId && existing.behalf_of_position_id !== existing.position_id) {
+       throw new Error('Unauthorized to edit this draft.');
+    }
+
     const query = `
       UPDATE documents 
       SET subject = COALESCE($1, subject),
@@ -171,23 +201,22 @@ const updateDraft = async (draftId, userId, data, role) => {
           is_restricted = COALESCE($4, is_restricted),
           restricted_to_user_id = COALESCE($5, restricted_to_user_id),
           draft_revision_note = COALESCE($6, draft_revision_note),
-          behalf_of_officer_id = COALESCE($7, behalf_of_officer_id),
-          behalf_of_position_id = COALESCE($8, behalf_of_position_id),
-          file_path = COALESCE($9, file_path),
+          behalf_of_position_id = COALESCE($7, behalf_of_position_id),
+          file_path = COALESCE($8, file_path),
           updated_at = NOW()
-      WHERE id = $10 AND status = 'draft'
+      WHERE id = $9 AND status = 'draft'
       RETURNING *
     `;
     const result = await client.query(query, [
       subject, body_html, receiver_department_id, 
       is_restricted, restricted_to_user_id, draft_revision_note,
-      data.behalf_of_officer_id || null, data.behalf_of_position_id || null,
+      behalf_of_position_id || null,
       file_path !== undefined ? file_path : null,
       draftId
     ]);
     const draft = result.rows[0];
 
-    // CC/BCC/References are easier to recreate for drafts
+    // CC/BCC/References recreate
     if (cc !== undefined || bcc !== undefined) {
       await client.query('DELETE FROM document_recipients WHERE document_id = $1', [draftId]);
       if (cc && Array.isArray(cc)) {
@@ -240,7 +269,7 @@ const updateDraft = async (draftId, userId, data, role) => {
 };
 
 /**
- * Assistant submits draft to officer.
+ * Assistant submits draft to officer position.
  */
 const submitDraft = async (draftId, userId) => {
   const query = `
@@ -248,7 +277,7 @@ const submitDraft = async (draftId, userId) => {
     SET draft_submitted_by = $1, 
         draft_submitted_at = NOW(),
         updated_at = NOW()
-    WHERE id = $2 AND status = 'draft' AND (behalf_of_officer_id IS NOT NULL OR behalf_of_position_id IS NOT NULL)
+    WHERE id = $2 AND status = 'draft' AND behalf_of_position_id IS NOT NULL
     RETURNING *
   `;
   const result = await db.query(query, [userId, draftId]);
@@ -261,7 +290,7 @@ const submitDraft = async (draftId, userId) => {
     action: 'draft.submitted',
     entityType: 'document',
     entityId: draft.id,
-    metadata: { officer_id: draft.behalf_of_officer_id }
+    metadata: { behalf_of_position_id: draft.behalf_of_position_id }
   });
 
   return draft;
@@ -274,20 +303,19 @@ const approveDraft = async (draftId, officerId) => {
   const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [officerId]);
   const userPosId = userRes.rows[0]?.position_id;
 
+  if (!userPosId) throw new Error('Officer must be assigned to a position.');
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Verify eligibility (User ID or Position ID)
-    let checkQuery = 'SELECT * FROM documents WHERE id = $1 AND status = \'draft\' AND (behalf_of_officer_id = $2';
-    const checkParams = [draftId, officerId];
-    if (userPosId) {
-      checkQuery += ' OR behalf_of_position_id = $3';
-      checkParams.push(userPosId);
-    }
-    checkQuery += ')';
-
-    const checkResult = await client.query(checkQuery, checkParams);
+    // 1. Verify eligibility via Position ID
+    const checkQuery = `
+      SELECT * FROM documents 
+      WHERE id = $1 AND status = 'draft' 
+      AND (created_by = $2 OR behalf_of_position_id = $3)
+    `;
+    const checkResult = await client.query(checkQuery, [draftId, officerId, userPosId]);
     const draft = checkResult.rows[0];
 
     if (!draft) throw new Error('Draft not found or unauthorized.');
@@ -308,12 +336,13 @@ const approveDraft = async (draftId, officerId) => {
     const result = await client.query(updateQuery, [outwardNumber, draftId]);
     const finalDoc = result.rows[0];
 
+
     await auditLog({
       actorId: officerId,
       action: 'draft.approved',
       entityType: 'document',
       entityId: draftId,
-      metadata: { outward_number: outwardNumber },
+      metadata: { outward_number: outwardNumber, position_id: userPosId },
       client
     });
 
@@ -334,20 +363,17 @@ const reviseDraft = async (draftId, officerId, note) => {
   const userRes = await db.query('SELECT position_id FROM users WHERE id = $1', [officerId]);
   const userPosId = userRes.rows[0]?.position_id;
 
-  let query = `
+  if (!userPosId) throw new Error('Officer must be assigned to a position.');
+
+  const query = `
     UPDATE documents 
     SET draft_revision_note = $1,
         updated_at = NOW()
-    WHERE id = $2 AND status = 'draft' AND (behalf_of_officer_id = $3
+    WHERE id = $2 AND status = 'draft' 
+      AND (created_by = $3 OR behalf_of_position_id = $4)
+    RETURNING *
   `;
-  const params = [note, draftId, officerId];
-  if (userPosId) {
-    query += ' OR behalf_of_position_id = $4';
-    params.push(userPosId);
-  }
-  query += ') RETURNING *';
-
-  const result = await db.query(query, params);
+  const result = await db.query(query, [note, draftId, officerId, userPosId]);
   const draft = result.rows[0];
 
   if (!draft) throw new Error('Draft not found or unauthorized.');
@@ -357,7 +383,7 @@ const reviseDraft = async (draftId, officerId, note) => {
     action: 'draft.revision_requested',
     entityType: 'document',
     entityId: draftId,
-    metadata: { note }
+    metadata: { note, position_id: userPosId }
   });
 
   return draft;
@@ -367,10 +393,23 @@ const reviseDraft = async (draftId, officerId, note) => {
  * Deletes a draft.
  */
 const deleteDraft = async (draftId, userId) => {
+  // 1. Get file path before deletion
+  const checkQuery = 'SELECT file_path FROM documents WHERE id = $1 AND created_by = $2 AND status = \'draft\'';
+  const checkRes = await db.query(checkQuery, [draftId, userId]);
+  const draft = checkRes.rows[0];
+
+  if (!draft) throw new Error('Draft not found or unauthorized.');
+
+  // 2. Delete Record
   const query = 'DELETE FROM documents WHERE id = $1 AND created_by = $2 AND status = \'draft\' RETURNING id';
   const result = await db.query(query, [draftId, userId]);
   
   if (result.rowCount === 0) throw new Error('Draft not found or unauthorized.');
+
+  // 3. Delete Physical File
+  if (draft.file_path) {
+    await deleteFile(draft.file_path);
+  }
 
   await auditLog({
     actorId: userId,
@@ -382,6 +421,7 @@ const deleteDraft = async (draftId, userId) => {
   return true;
 };
 
+
 module.exports = {
   listDrafts,
   createDraft,
@@ -391,3 +431,4 @@ module.exports = {
   reviseDraft,
   deleteDraft
 };
+

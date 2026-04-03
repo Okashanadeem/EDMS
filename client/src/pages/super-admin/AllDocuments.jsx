@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   ArrowUpDown
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const AllDocuments = () => {
   const navigate = useNavigate();
@@ -26,6 +27,11 @@ const AllDocuments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 10;
+
   // Filters
   const [filters, setFilters] = useState({
     search: '',
@@ -35,7 +41,7 @@ const AllDocuments = () => {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [currentPage]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -49,14 +55,18 @@ const AllDocuments = () => {
       if (filters.department_id) params.append('department_id', filters.department_id);
       if (filters.status) params.append('status', filters.status);
       if (filters.search) params.append('q', filters.search);
+      params.append('page', currentPage);
+      params.append('limit', itemsPerPage);
       
       const response = await api.get(`/documents?${params.toString()}`);
       setDocuments(response.data.data || []);
+      setTotalItems(response.data.total || 0);
       setError('');
     } catch (err) {
       setError('System Registry: Failed to retrieve official records.');
     }
   };
+
 
   const fetchDepartments = async () => {
     try {
@@ -246,7 +256,15 @@ const AllDocuments = () => {
           </table>
         </div>
       </div>
+
+      <Pagination
+        total={totalItems}
+        page={currentPage}
+        limit={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
+
   );
 };
 

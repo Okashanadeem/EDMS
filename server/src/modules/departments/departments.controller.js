@@ -4,13 +4,20 @@ const departmentService = require('./departments.service');
  * Handles listing all departments.
  */
 const listDepartments = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
   try {
-    const data = await departmentService.listDepartments();
-    res.status(200).json({ success: true, data });
+    const data = await departmentService.listDepartments(
+      req.user.role, 
+      parseInt(page), 
+      parseInt(limit)
+    );
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch departments.' });
   }
 };
+
+
 
 /**
  * Handles creating a new department.

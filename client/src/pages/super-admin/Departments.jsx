@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { Plus, Edit2, Trash2, Check, X, AlertCircle, Users } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const Departments = () => {
   const [departments, setDepartments] = useState([]);
@@ -10,19 +11,25 @@ const Departments = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 10;
+  
   // Form state
   const [formData, setFormData] = useState({ name: '', code: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
-  }, []);
+  }, [currentPage]);
 
   const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/departments');
+      const response = await api.get(`/departments?page=${currentPage}&limit=${itemsPerPage}`);
       setDepartments(response.data.data || []);
+      setTotalItems(response.data.total || 0);
       setError('');
     } catch (err) {
       setError('Failed to fetch departments');
@@ -31,6 +38,7 @@ const Departments = () => {
       setLoading(false);
     }
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -177,7 +185,15 @@ const Departments = () => {
         </table>
       </div>
 
+      <Pagination
+        total={totalItems}
+        page={currentPage}
+        limit={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
+
       {/* Modal */}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">

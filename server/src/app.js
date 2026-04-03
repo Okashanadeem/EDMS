@@ -8,7 +8,9 @@ const app = express();
 
 // Global Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['Content-Disposition']
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 

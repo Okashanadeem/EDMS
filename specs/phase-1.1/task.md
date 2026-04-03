@@ -53,3 +53,36 @@
 66. [x] Create `DepartmentHistory.jsx` component for universal department view.
 67. [x] Add "History" link to `WorkerLayout`, `OfficerLayout`, and `AssistantLayout`.
 68. [x] Register routes for `/history` in `App.jsx`.
+
+## 🧩 Milestone 13: Total Position-Based Architecture Transition
+69. [x] Apply `position_upgrade.sql` migration and refactor `users` table to remove direct `officer_id`.
+70. [x] Implement comprehensive Positions Module (CRUD) and integrate into `users.service.js` for role inheritance.
+71. [x] Update User Management logic to fully support Position-based setup (Assistant linked to Officer Position).
+72. [x] Refactor Drafts and Documents to use `position_id` for all ownership and "behalf of" logic (remove `behalf_of_officer_id`).
+73. [x] Update OTP system to target the current active user holding the Officer Position.
+74. [x] Audit and refactor all system-wide queries to ensure zero reliance on `users.id` for role-based assignments or hierarchy.
+
+## 🧩 Milestone 14: Full System Cleanup & Tooling Refinement
+75. [x] Update `test.service.js` to clear all 15+ tables in correct dependency order, preserving only the root Super Admin.
+76. [x] Reset all numbering sequences and clear the `uploads` directory during cleanup.
+77. [x] Update `Dev/EDMS_Postman_Collection.json` with all new Position-based endpoints and documentation.
+78. [x] Perform a full system smoke test using the new position-based flow and verification.
+
+## 🧩 Milestone 15: Enterprise Refinement & Data Integrity
+79. [ ] Implement DB Triggers or Service Logic to auto-sync User Role/Dept when Position is updated.
+80. [ ] Refactor `deleteDraft` to automatically remove physical files from the `uploads` directory.
+81. [ ] Update `auditLog` to record `position_id` alongside `actor_id` for long-term accountability.
+82. [ ] Refine `otp.service.js` error handling to provide actionable feedback for vacant parent positions.
+
+## 🧩 Milestone 16: Security Hardening & Super Admin Visibility
+83. [ ] Enforce "Seeded-Only" Super Admin policy: Prevent creation of `super_admin` role via API/UI.
+84. [ ] Filter Super Admin from all document recipient selectors (CC/BCC/Direct) for standard users.
+85. [ ] Restrict Super Admin visibility in User Management: Only visible to other Super Admins.
+86. [ ] Audit all position-based inheritance logic to ensure absolute isolation between organizational units.
+
+## 🧩 Milestone 18: Attachment Verification & Preview Flow
+93. [x] Implement `AttachmentPreviewModal` for verification before staged upload.
+94. [x] Integrate OK/Cancel workflow into `Compose.jsx` file selection.
+95. [x] Update `server/src/app.js` CORS settings to expose `Content-Disposition`.
+
+

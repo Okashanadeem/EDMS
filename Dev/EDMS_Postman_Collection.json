@@ -1,0 +1,385 @@
+{
+	"info": {
+		"_postman_id": "edms-v1-1-position-collection",
+		"name": "EDMS API - Phase 1.1 (Position-Based)",
+		"description": "Comprehensive Postman collection for the Electronic Document Management System (Phase 1.1). Refactored for Total Position-Based Architecture.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@edms.local\",\n    \"password\": \"Admin@1234\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"currentPassword\": \"Admin@1234\",\n    \"newPassword\": \"NewSecurePass@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/change-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Positions",
+			"item": [
+				{
+					"name": "List Positions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/positions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"positions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Position (Officer)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Director IT\",\n    \"role\": \"officer\",\n    \"department_id\": 1,\n    \"can_send_on_behalf\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/positions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"positions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Position (Assistant)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Assistant to Director IT\",\n    \"role\": \"assistant\",\n    \"department_id\": 1,\n    \"parent_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/positions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"positions"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "List Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create User (assigned to position)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@edms.local\",\n    \"position_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Drafts",
+			"item": [
+				{
+					"name": "List Drafts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/drafts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"drafts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Draft (Position-based)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "subject", "value": "Budget Review", "type": "text" },
+								{ "key": "body_html", "value": "<h1>Review requested</h1>", "type": "text" },
+								{ "key": "receiver_department_id", "value": "2", "type": "text" }
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/drafts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"drafts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Draft (to parent position)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/drafts/1/submit",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"drafts",
+								"1",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Draft (by officer position)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/drafts/1/approve",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"drafts",
+								"1",
+								"approve"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "OTP (Position-Based)",
+			"item": [
+				{
+					"name": "Request OTP (targets parent position)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/otp/request",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"otp",
+								"request"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document_id\": 1,\n    \"otp\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/otp/verify",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"otp",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Testing",
+			"item": [
+				{
+					"name": "Comprehensive System Cleanup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "x-internal-test", "value": "true", "type": "text" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/test/cleanup",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"test",
+								"cleanup"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:4000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "your_jwt_token_here",
+			"type": "string"
+		}
+	]
+}

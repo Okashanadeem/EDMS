@@ -14,6 +14,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import DraftReviewPanel from '../../components/DraftReviewPanel';
+import Pagination from '../../components/Pagination';
 
 const Drafts = () => {
   const navigate = useNavigate();
@@ -25,32 +26,31 @@ const Drafts = () => {
   const [selectedDraft, setSelectedDraft] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDrafts();
-  }, []);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 10;
 
   useEffect(() => {
-    if (user?.role === 'officer' && drafts.length > 0) {
-      const hasReviewDrafts = drafts.some(d => 
-        (Number(d.behalf_of_officer_id) === Number(user.id) || 
-         (d.behalf_of_position_id && Number(d.behalf_of_position_id) === Number(user.position_id))) 
-        && d.draft_submitted_at
-      );
-      if (hasReviewDrafts) setActiveTab('review');
-    }
-  }, [drafts, user]);
+    fetchDrafts();
+  }, [currentPage, activeTab]);
 
   const fetchDrafts = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/drafts');
-      setDrafts(res.data.data);
+      const res = await api.get(`/drafts?page=${currentPage}&limit=${itemsPerPage}`);
+      // Note: The backend listDrafts currently returns all drafts for the role.
+      // For a "perfect" system, we should filter by tab on the server side too, 
+      // but for now we'll handle the paginated response structure.
+      setDrafts(res.data.data || []);
+      setTotalItems(res.data.total || 0);
     } catch (err) {
       console.error('Failed to fetch drafts');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
@@ -215,9 +215,17 @@ const Drafts = () => {
               })}
             </div>
           )}
+
+          <Pagination
+            total={totalItems}
+            page={currentPage}
+            limit={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         </div>
 
         {/* Preview / Action Side */}
+
         <div className="w-full lg:w-1/3">
           <div className="sticky top-8 space-y-6">
             {selectedDraft ? (

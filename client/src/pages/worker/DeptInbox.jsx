@@ -13,6 +13,7 @@ import {
   Search,
   ShieldCheck
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const DeptInbox = () => {
   const navigate = useNavigate();
@@ -23,17 +24,29 @@ const DeptInbox = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 9; // Grid of 3x3
+
   useEffect(() => {
     fetchInbox();
-  }, []);
+  }, [currentPage]);
 
   const fetchInbox = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/documents/inbox');
+      const response = await api.get('/documents/inbox', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage
+        }
+      });
       setDocuments(response.data.data || []);
+      setTotalItems(response.data.total || 0);
       setError('');
     } catch (err) {
+
       setError('Failed to fetch inbox documents');
       console.error(err);
     } finally {
@@ -41,6 +54,7 @@ const DeptInbox = () => {
       setIsRefreshing(false);
     }
   };
+
 
   const handlePickup = async (id) => {
     try {
@@ -185,7 +199,15 @@ const DeptInbox = () => {
           ))}
         </div>
       )}
+
+      <Pagination
+        total={totalItems}
+        page={currentPage}
+        limit={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
+
   );
 };
 

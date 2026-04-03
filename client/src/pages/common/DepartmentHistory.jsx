@@ -15,6 +15,7 @@ import {
   AlertCircle,
   User
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const DepartmentHistory = () => {
   const navigate = useNavigate();
@@ -25,22 +26,35 @@ const DepartmentHistory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all'); // all, assigned, outgoing, incoming
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [currentPage]);
 
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/documents/department');
+      const response = await api.get('/documents/department', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage
+        }
+      });
       setDocuments(response.data.data || []);
+      setTotalItems(response.data.total || 0);
     } catch (err) {
+
       setError('Failed to fetch department history');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -191,7 +205,15 @@ const DepartmentHistory = () => {
           </table>
         </div>
       </div>
+
+      <Pagination
+        total={totalItems}
+        page={currentPage}
+        limit={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
+
   );
 };
 

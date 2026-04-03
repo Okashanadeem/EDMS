@@ -32,10 +32,22 @@ router.get('/mine', authMiddleware, rbacMiddleware('worker', 'officer', 'assista
 router.get('/inbox', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getInbox);
 
 /**
+ * @route GET /api/v1/documents/department
+ * @access worker, officer, assistant
+ */
+router.get('/department', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getDepartmentHistory);
+
+/**
  * @route GET /api/v1/documents/:id
  * @access authenticated
  */
 router.get('/:id', authMiddleware, documentController.getDocumentDetail);
+
+/**
+ * @route GET /api/v1/documents/:id/attachment
+ * @access authenticated
+ */
+router.get('/:id/attachment', authMiddleware, documentController.downloadAttachment);
 
 /**
  * @route POST /api/v1/documents
@@ -66,11 +78,5 @@ router.post('/:id/complete', authMiddleware, rbacMiddleware('worker', 'officer')
  * @access worker, officer
  */
 router.post('/:id/forward', authMiddleware, rbacMiddleware('worker', 'officer'), documentController.forwardDocument);
-
-/**
- * @route GET /api/v1/documents/department
- * @access worker, officer, assistant
- */
-router.get('/department', authMiddleware, rbacMiddleware('worker', 'officer', 'assistant'), documentController.getDepartmentHistory);
 
 module.exports = router;
