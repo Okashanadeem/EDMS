@@ -1,5 +1,8 @@
+const path = require('path');
+const fs = require('fs');
 const documentService = require('./documents.service');
 const { saveFile } = require('../../utils/storage');
+const db = require('../../config/db');
 
 /**
  * Handles document creation and dispatch.
@@ -59,13 +62,21 @@ const createDocument = async (req, res) => {
  * Handles fetching department inbox.
  */
 const getInbox = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
   try {
-    const data = await documentService.getInbox(req.user.department_id, req.user.id, req.user.role);
-    res.status(200).json({ success: true, data });
+    const data = await documentService.getInbox(
+      req.user.department_id, 
+      req.user.id, 
+      req.user.role,
+      parseInt(page),
+      parseInt(limit)
+    );
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch inbox.' });
   }
 };
+
 
 /**
  * Handles document pickup from inbox.
@@ -149,30 +160,39 @@ const forwardDocument = async (req, res) => {
  * Handles fetching documents assigned to or created by a worker.
  */
 const getMyDocuments = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
   try {
-    const data = await documentService.getMyDocuments(req.user.id, req.user.department_id, req.user.role);
-    res.status(200).json({ success: true, data });
+    const data = await documentService.getMyDocuments(
+      req.user.id, 
+      req.user.department_id, 
+      req.user.role,
+      parseInt(page),
+      parseInt(limit)
+    );
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch your documents.' });
   }
 };
 
+
 /**
  * Handles system-wide document listing (Super Admin).
  */
 const listAllDocuments = async (req, res) => {
-  const { department_id, status, assigned_to, q } = req.query;
+  const { department_id, status, assigned_to, q, page = 1, limit = 10 } = req.query;
   try {
     const data = await documentService.listAllDocuments(
-      { department_id, status, assigned_to, q },
+      { department_id, status, assigned_to, q, page: parseInt(page), limit: parseInt(limit) },
       req.user.id,
       req.user.role
     );
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch documents.' });
   }
 };
+
 
 /**
  * Handles fetching document detail.
@@ -203,6 +223,25 @@ const getDocumentDetail = async (req, res) => {
       if (!isSenderDept && !isReceiverDept && !isCreator && !isAssignee && !isCCd && !isBCCd) {
         return res.status(403).json({ success: false, error: 'Not authorized to view this document.' });
       }
+
+      // Add POV-aware display name for the UI label
+      if (data.file_path) {
+        const ext = path.extname(data.file_path);
+        let povName = data.file_path; // Default
+        
+        if (isSenderDept) povName = data.outward_number || 'OUTWARD';
+        else if (isReceiverDept) povName = data.inward_number || data.outward_number || 'INWARD';
+        else if (isCCd || isBCCd) {
+           // We need the recipient inward number from the DB for detail view too
+           const drQuery = 'SELECT inward_number FROM document_recipients WHERE document_id = $1 AND department_id = $2';
+           const drRes = await db.query(drQuery, [id, req.user.department_id]);
+           povName = drRes.rows[0]?.inward_number || data.outward_number || 'INWARD';
+        }
+        data.display_filename = povName.replace(/\//g, '_') + ext;
+      }
+    } else if (data.file_path) {
+      // Super Admin sees outward number as name
+      data.display_filename = (data.outward_number || 'DOCUMENT').replace(/\//g, '_') + path.extname(data.file_path);
     }
     
     res.status(200).json({ success: true, data });
@@ -215,17 +254,88 @@ const getDocumentDetail = async (req, res) => {
  * Handles fetching all documents related to a department.
  */
 const getDepartmentHistory = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
   try {
     const data = await documentService.getDepartmentHistory(
       req.user.department_id, 
       req.user.id, 
-      req.user.role
+      req.user.role,
+      parseInt(page),
+      parseInt(limit)
     );
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch department history.' });
   }
 };
+
+/**
+ * Serves a document attachment with dynamic POV-based naming.
+ */
+const downloadAttachment = async (req, res) => {
+  const { id } = req.params;
+  const { id: userId, department_id: userDeptId, role } = req.user;
+
+  try {
+    // 1. Fetch document and recipient info
+    const docQuery = `
+      SELECT d.*, dr.inward_number as recipient_inward_number, dr.recipient_type
+      FROM documents d
+      LEFT JOIN document_recipients dr ON d.id = dr.document_id AND dr.department_id = $2
+      WHERE d.id = $1
+    `;
+    const docResult = await db.query(docQuery, [id, userDeptId]);
+    const document = docResult.rows[0];
+
+    if (!document || !document.file_path) {
+      return res.status(404).json({ success: false, error: 'Attachment not found.' });
+    }
+
+    // 2. Authorization Check
+    const isSenderDept = document.sender_department_id === userDeptId;
+    const isReceiverDept = document.receiver_department_id === userDeptId;
+    const isCCBCC = !!document.recipient_type;
+    const isCreator = document.created_by === userId;
+
+    if (role !== 'super_admin' && !isSenderDept && !isReceiverDept && !isCCBCC && !isCreator) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to download this attachment.' });
+    }
+
+    // 3. Determine Dynamic Filename
+    let downloadName = document.file_path; // Default
+    const extension = path.extname(document.file_path);
+
+    if (isSenderDept) {
+      // Senders see the Outward Number
+      downloadName = document.outward_number || 'OUTWARD';
+    } else if (isReceiverDept) {
+      // Primary Receivers see their Inward Number
+      downloadName = document.inward_number || document.outward_number || 'INWARD';
+    } else if (isCCBCC) {
+      // CC/BCC recipients see their specific Inward Number
+      downloadName = document.recipient_inward_number || document.outward_number || 'INWARD';
+    }
+
+    // Sanitize filename
+    downloadName = downloadName.replace(/\//g, '_') + extension;
+
+    // 4. Serve File
+    // Resolve absolute path: server/src/modules/documents -> server/uploads
+    const filePath = path.join(__dirname, '../../../uploads', document.file_path);
+
+    if (!fs.existsSync(filePath)) {
+      console.error('File not found at:', filePath);
+      return res.status(404).json({ success: false, error: 'Physical file missing from server.' });
+    }
+
+    res.download(filePath, downloadName);
+
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ success: false, error: 'Failed to download attachment.' });
+  }
+};
+
 
 module.exports = {
   createDocument,
@@ -237,5 +347,6 @@ module.exports = {
   getMyDocuments,
   getDepartmentHistory,
   listAllDocuments,
-  getDocumentDetail
+  getDocumentDetail,
+  downloadAttachment
 };

@@ -2,12 +2,28 @@ const db = require('../../config/db');
 
 /**
  * Lists all departments.
+ * Security: Hides 'System Administration' from non-super-admins.
  */
-const listDepartments = async () => {
-  const query = 'SELECT id, name, code, is_active, created_at FROM departments ORDER BY name ASC';
-  const result = await db.query(query);
-  return result.rows;
+const listDepartments = async (actorRole, page = 1, limit = 10) => {
+  const offset = (page - 1) * limit;
+  let query = 'FROM departments WHERE 1=1';
+  
+  if (actorRole !== 'super_admin') {
+    query += " AND name != 'System Administration'";
+  }
+  
+  const countResult = await db.query(`SELECT COUNT(*) ${query}`);
+  const dataResult = await db.query(`SELECT id, name, code, is_active, created_at ${query} ORDER BY name ASC LIMIT $1 OFFSET $2`, [limit, offset]);
+
+  return {
+    total: parseInt(countResult.rows[0].count),
+    page: parseInt(page),
+    limit: parseInt(limit),
+    data: dataResult.rows
+  };
 };
+
+
 
 /**
  * Creates a new department.

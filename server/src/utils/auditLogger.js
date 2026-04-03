@@ -11,18 +11,24 @@ const db = require('../config/db');
  * @param {object} [params.client] - Optional pg transaction client.
  */
 const auditLog = async ({ actorId, action, entityType, entityId, metadata, client }) => {
+  const pgClient = client || db;
+
+  // 1. Fetch current position of the actor for point-in-time record
+  const userRes = await pgClient.query('SELECT position_id FROM users WHERE id = $1', [actorId]);
+  const positionId = userRes.rows[0]?.position_id || null;
+
   const query = `
-    INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO audit_logs (actor_id, position_id, action, entity_type, entity_id, metadata)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *
   `;
-  const params = [actorId, action, entityType, entityId, metadata];
+  const params = [actorId, positionId, action, entityType, entityId, metadata];
   
-  const pgClient = client || db;
   const result = await pgClient.query(query, params);
   
   return result.rows[0];
 };
+
 
 module.exports = {
   auditLog

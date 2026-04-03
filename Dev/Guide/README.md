@@ -43,13 +43,37 @@ Open your PostgreSQL terminal (psql) or use a GUI like pgAdmin/DBeaver:
    ```bash
    npm install
    ```
-3. Create a `.env` file. For a detailed guide on what to put in this file and how to generate secure values, see **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)**.
-   ```env
-   DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/edms_db
-   JWT_SECRET=your_super_secret_random_string_here
-   ...
-   ```
-   *(Replace `YOUR_PASSWORD` with your actual PostgreSQL password).*
+3. Create a `.env` file and configure it using the details below.
+
+#### **Environment Configuration (`server/.env`)**
+
+The backend requires these variables to handle the database, security, and automated emails.
+
+*   **Database Configuration**
+    *   **`DATABASE_URL`**: `postgresql://[user]:[password]@[host]:[port]/edms_db`
+*   **Security (JWT)**
+    *   **`JWT_SECRET`**: Generate a secure 64-character string:
+        ```bash
+        node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+        ```
+    *   **`JWT_EXPIRES_IN`**: Recommended: `8h` (8 hours).
+*   **Application Settings**
+    *   **`PORT`**: Default is `4000`.
+    *   **`NODE_ENV`**: Set to `development`.
+*   **SMTP Email Configuration**
+    *   **Option A: For Development (using Mailtrap)**
+        *   `SMTP_HOST=smtp.mailtrap.io`
+        *   `SMTP_PORT=2525`
+        *   `SMTP_USER=your_mailtrap_username`
+        *   `SMTP_PASS=your_mailtrap_password`
+    *   **Option B: For Production (using Gmail)**
+        *   `SMTP_HOST=smtp.gmail.com`
+        *   `SMTP_PORT=465`
+        *   `SMTP_SECURE=true`
+        *   `SMTP_USER=your_email@gmail.com`
+        *   `SMTP_PASS=your_app_password`
+
+---
 
 ### 3. Frontend Configuration
 1. Navigate to the `client` directory:
@@ -115,9 +139,7 @@ Use these to log in for the first time as Super Admin:
 
 ## 🧹 Full System Cleanup (Internal Testing Only)
 
-To wipe all documents, logs, departments, and non-admin users while resetting the system to its initial state, use the built-in testing utility. 
-
-### ⚠️ Warning: This action is irreversible.
+To wipe all documents, logs, departments, and non-admin users while resetting the system to its initial state:
 
 #### Using PowerShell (Windows)
 Run this command while the backend server is active:
@@ -125,9 +147,7 @@ Run this command while the backend server is active:
 Invoke-RestMethod -Uri "http://localhost:4000/api/v1/test/cleanup" -Method Post -Headers @{"x-internal-test"="true"}
 ```
 
-#### Using cURL / Postman
-- **Method:** `POST`
-- **URL:** `http://localhost:4000/api/v1/test/cleanup`
-- **Header:** `x-internal-test: true`
-
-**Note:** This utility preserves the initial `superadmin@edms.local` account from `seed.sql`.
+#### Using cURL
+```bash
+curl -X POST http://localhost:4000/api/v1/test/cleanup -H "x-internal-test: true"
+```

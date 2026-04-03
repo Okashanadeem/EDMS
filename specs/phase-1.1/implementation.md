@@ -28,6 +28,7 @@
 | **OTP Delegation** | Officer's email acts as the 2nd factor for Assistant dispatch. | Secure, faster routing for busy Officers. |
 | **BCC Storage** | Stored in `document_recipients` rather than main `documents` table. | Keeps record clean; allows per-recipient inward numbers. |
 | **Blob URL Previews** | Uses `URL.createObjectURL` for instant local file rendering. | Better UX for verifying attachments before dispatch. |
+| **POV-Based Naming** | Dynamic download endpoint uses `Content-Disposition` based on user's department (Inward vs Outward). | One backend file, multiple names depending on viewer. |
 
 ## 🐞 Critical Bug Fixes (Phase 1.1)
 - **RBAC Scope Expansion:** Updated `/departments`, `/users`, and `/documents` listing to allow non-admins access for selection/searching.

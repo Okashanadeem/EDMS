@@ -6,9 +6,9 @@ const { sendCredentials } = require('../../utils/mailer');
 /**
  * Lists all positions.
  */
-const listPositions = async ({ departmentId, role }) => {
+const listPositions = async ({ departmentId, role, page = 1, limit = 10 }) => {
+  const offset = (page - 1) * limit;
   let query = `
-    SELECT p.*, d.name as department_name, parent.title as parent_title
     FROM positions p
     LEFT JOIN departments d ON p.department_id = d.id
     LEFT JOIN positions parent ON p.parent_id = parent.id
@@ -27,10 +27,25 @@ const listPositions = async ({ departmentId, role }) => {
     params.push(role);
   }
 
-  query += ' ORDER BY p.title ASC';
-  const result = await db.query(query, params);
-  return result.rows;
+  const countQuery = `SELECT COUNT(*) ${query}`;
+  const dataQuery = `
+    SELECT p.*, d.name as department_name, parent.title as parent_title 
+    ${query} 
+    ORDER BY p.title ASC 
+    LIMIT $${index++} OFFSET $${index++}
+  `;
+  
+  const countResult = await db.query(countQuery, params);
+  const dataResult = await db.query(dataQuery, [...params, limit, offset]);
+
+  return {
+    total: parseInt(countResult.rows[0].count),
+    page: parseInt(page),
+    limit: parseInt(limit),
+    data: dataResult.rows
+  };
 };
+
 
 /**
  * Creates a new position.
@@ -41,7 +56,13 @@ const createPosition = async ({ title, role, department_id, parent_id, can_send_
     VALUES ($1, $2, $3, $4, $5)
     RETURNING *
   `;
-  const result = await db.query(query, [title, role, department_id, parent_id || null, can_send_on_behalf || false]);
+  const result = await db.query(query, [
+    title, 
+    role, 
+    department_id || null, 
+    parent_id || null, 
+    can_send_on_behalf || false
+  ]);
   return result.rows[0];
 };
 
@@ -63,11 +84,11 @@ const updatePosition = async (id, updates) => {
   }
   if (updates.department_id !== undefined) {
     fields.push(`department_id = $${index++}`);
-    values.push(updates.department_id);
+    values.push(updates.department_id || null);
   }
   if (updates.parent_id !== undefined) {
     fields.push(`parent_id = $${index++}`);
-    values.push(updates.parent_id);
+    values.push(updates.parent_id || null);
   }
   if (updates.can_send_on_behalf !== undefined) {
     fields.push(`can_send_on_behalf = $${index++}`);
@@ -77,6 +98,7 @@ const updatePosition = async (id, updates) => {
     fields.push(`is_active = $${index++}`);
     values.push(updates.is_active);
   }
+
 
   if (fields.length === 0) return null;
 
@@ -95,21 +117,22 @@ const updatePosition = async (id, updates) => {
 /**
  * Lists all users. Supports filtering by department_id and role.
  */
-const listUsers = async ({ departmentId, role }) => {
+const listUsers = async ({ departmentId, role, page = 1, limit = 10 }, actorRole) => {
+  const offset = (page - 1) * limit;
   let query = `
-    SELECT 
-      u.id, u.name, u.email, u.role, u.department_id, 
-      d.name as department_name, u.officer_id, off.name as officer_name,
-      u.can_send_on_behalf, u.is_active, u.created_at,
-      u.position_id, p.title as position_title
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
-    LEFT JOIN users off ON u.officer_id = off.id
     LEFT JOIN positions p ON u.position_id = p.id
     WHERE 1=1
   `;
+
   const params = [];
   let index = 1;
+
+  // Security: Only super_admins can see other super_admins
+  if (actorRole !== 'super_admin') {
+    query += ` AND u.role != 'super_admin'`;
+  }
 
   if (departmentId) {
     query += ` AND u.department_id = $${index++}`;
@@ -121,56 +144,74 @@ const listUsers = async ({ departmentId, role }) => {
     params.push(role);
   }
 
-  query += ' ORDER BY u.name ASC';
-  const result = await db.query(query, params);
-  return result.rows;
+  const countQuery = `SELECT COUNT(*) ${query}`;
+  const dataQuery = `
+    SELECT 
+      u.id, u.name, u.email, u.role, u.department_id, 
+      d.name as department_name, 
+      u.can_send_on_behalf, u.is_active, u.created_at,
+      u.position_id, p.title as position_title
+    ${query} 
+    ORDER BY u.name ASC 
+    LIMIT $${index++} OFFSET $${index++}
+  `;
+
+  const countResult = await db.query(countQuery, params);
+  const dataResult = await db.query(dataQuery, [...params, limit, offset]);
+
+  return {
+    total: parseInt(countResult.rows[0].count),
+    page: parseInt(page),
+    limit: parseInt(limit),
+    data: dataResult.rows
+  };
 };
+
 
 /**
  * Creates a new user with a temporary password.
- * Supports Phase 1.1 roles: worker, officer, assistant.
+ * Fully position-based. Inherits role, department, and hierarchy from the assigned position.
  */
-const createUser = async ({ name, email, role, department_id, officer_id, can_send_on_behalf, position_id }) => {
-  const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
-
-  // If position_id is provided, inherit role/dept from position
-  let finalRole = role || 'worker';
-  let finalDept = department_id;
-  let finalOfficer = officer_id;
-  let finalCanSend = can_send_on_behalf;
-
-  if (position_id) {
-    const posResult = await db.query('SELECT * FROM positions WHERE id = $1', [position_id]);
-    const pos = posResult.rows[0];
-    if (pos) {
-      finalRole = pos.role;
-      finalDept = pos.department_id;
-      finalCanSend = pos.can_send_on_behalf;
-      
-      if (pos.parent_id) {
-        // Find the user currently in the parent position
-        const parentUserRes = await db.query('SELECT id FROM users WHERE position_id = $1 AND is_active = TRUE', [pos.parent_id]);
-        finalOfficer = parentUserRes.rows[0]?.id || null;
-      }
-    }
+const createUser = async ({ name, email, position_id }) => {
+  if (!position_id) {
+    throw new Error('A valid position_id is required to create a user.');
   }
 
+  // 1. Fetch position details to inherit role/department
+  const posResult = await db.query('SELECT * FROM positions WHERE id = $1', [position_id]);
+  const pos = posResult.rows[0];
+  if (!pos) throw new Error('Position not found.');
+  if (!pos.is_active) throw new Error('Cannot assign user to an inactive position.');
+
+  // Block creation of additional Super Admins via API
+  if (pos.role === 'super_admin') {
+    throw new Error('New Super Admin accounts cannot be created via the system. They must be seeded manually by the Database Administrator.');
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+
+  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+
+  // Note: officer_id and can_send_on_behalf are now derived from position hierarchy
+  // but we still store them for performance or legacy if needed, 
+  // though the goal is to deprecate direct user links.
+  
   const query = `
-    INSERT INTO users (name, email, password_hash, role, department_id, officer_id, can_send_on_behalf, position_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    RETURNING id, name, email, role, department_id, officer_id, can_send_on_behalf, position_id
+    INSERT INTO users (name, email, password_hash, role, department_id, position_id, can_send_on_behalf)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, name, email, role, department_id, position_id, can_send_on_behalf
   `;
+  
   const result = await db.query(query, [
     name, 
     email, 
     passwordHash, 
-    finalRole, 
-    finalDept, 
-    finalOfficer || null, 
-    finalCanSend || false,
-    position_id || null
+    pos.role, 
+    pos.department_id, 
+    position_id,
+    pos.can_send_on_behalf
   ]);
+  
   const user = result.rows[0];
 
   // Send credentials via email (async)
@@ -183,6 +224,7 @@ const createUser = async ({ name, email, role, department_id, officer_id, can_se
     temporaryPassword
   };
 };
+
 
 /**
  * Updates a user's details (partial update supported).
@@ -197,11 +239,17 @@ const updateUser = async (id, updates) => {
     values.push(updates.name);
   }
 
+  if (updates.email !== undefined) {
+    fields.push(`email = $${index++}`);
+    values.push(updates.email);
+  }
+
+
   if (updates.position_id !== undefined) {
     fields.push(`position_id = $${index++}`);
     values.push(updates.position_id);
     
-    // If assigning to a position, also update role/dept/officer_id automatically
+    // If assigning to a position, also update role/dept automatically
     if (updates.position_id) {
       const posResult = await db.query('SELECT * FROM positions WHERE id = $1', [updates.position_id]);
       const pos = posResult.rows[0];
@@ -212,15 +260,6 @@ const updateUser = async (id, updates) => {
         values.push(pos.department_id);
         fields.push(`can_send_on_behalf = $${index++}`);
         values.push(pos.can_send_on_behalf);
-
-        if (pos.parent_id) {
-          const parentUserRes = await db.query('SELECT id FROM users WHERE position_id = $1 AND is_active = TRUE', [pos.parent_id]);
-          fields.push(`officer_id = $${index++}`);
-          values.push(parentUserRes.rows[0]?.id || null);
-        } else {
-           fields.push(`officer_id = $${index++}`);
-           values.push(null);
-        }
       }
     }
   } else {
@@ -232,10 +271,6 @@ const updateUser = async (id, updates) => {
     if (updates.department_id !== undefined) {
       fields.push(`department_id = $${index++}`);
       values.push(updates.department_id);
-    }
-    if (updates.officer_id !== undefined) {
-      fields.push(`officer_id = $${index++}`);
-      values.push(updates.officer_id);
     }
     if (updates.can_send_on_behalf !== undefined) {
       fields.push(`can_send_on_behalf = $${index++}`);
@@ -255,12 +290,13 @@ const updateUser = async (id, updates) => {
     UPDATE users 
     SET ${fields.join(', ')} 
     WHERE id = $${index} 
-    RETURNING id, name, email, role, department_id, officer_id, can_send_on_behalf, is_active, position_id
+    RETURNING id, name, email, role, department_id, can_send_on_behalf, is_active, position_id
   `;
   
   const result = await db.query(query, values);
   return result.rows[0];
 };
+
 
 /**
  * Resets a user's password.

@@ -3,41 +3,55 @@ const db = require('../../config/db');
 /**
  * Lists audit logs with optional filters.
  */
-const listLogs = async ({ entity_id, actor_id, action, from, to }) => {
-  let query = `
-    SELECT al.*, u.name as actor_name
-    FROM audit_logs al
-    JOIN users u ON al.actor_id = u.id
-    WHERE 1=1
-  `;
+const listLogs = async ({ entity_id, actor_id, action, from, to, page = 1, limit = 50 }) => {
+  const offset = (page - 1) * limit;
+  let whereClause = 'WHERE 1=1';
   const params = [];
   let counter = 1;
 
   if (entity_id) {
-    query += ` AND al.entity_id = $${counter++}`;
+    whereClause += ` AND al.entity_id = $${counter++}`;
     params.push(entity_id);
   }
   if (actor_id) {
-    query += ` AND al.actor_id = $${counter++}`;
+    whereClause += ` AND al.actor_id = $${counter++}`;
     params.push(actor_id);
   }
   if (action) {
-    query += ` AND al.action = $${counter++}`;
+    whereClause += ` AND al.action = $${counter++}`;
     params.push(action);
   }
   if (from) {
-    query += ` AND al.created_at >= $${counter++}`;
+    whereClause += ` AND al.created_at >= $${counter++}`;
     params.push(from);
   }
   if (to) {
-    query += ` AND al.created_at <= $${counter++}`;
+    whereClause += ` AND al.created_at <= $${counter++}`;
     params.push(to);
   }
 
-  query += ' ORDER BY al.created_at DESC LIMIT 1000';
-  const result = await db.query(query, params);
-  return result.rows;
+  const countQuery = `SELECT COUNT(*) FROM audit_logs al ${whereClause}`;
+  const dataQuery = `
+    SELECT al.*, u.name as actor_name, p.title as position_title
+    FROM audit_logs al
+    JOIN users u ON al.actor_id = u.id
+    LEFT JOIN positions p ON al.position_id = p.id
+    ${whereClause}
+    ORDER BY al.created_at DESC 
+    LIMIT $${counter++} OFFSET $${counter++}
+  `;
+
+  const countResult = await db.query(countQuery, params);
+  const dataResult = await db.query(dataQuery, [...params, limit, offset]);
+
+  return {
+    total: parseInt(countResult.rows[0].count),
+    page: parseInt(page),
+    limit: parseInt(limit),
+    data: dataResult.rows
+  };
 };
+
 
 module.exports = {
   listLogs

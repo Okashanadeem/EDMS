@@ -4,14 +4,20 @@ const userService = require('./users.service');
  * Handles listing all positions.
  */
 const listPositions = async (req, res) => {
-  const { department_id, role } = req.query;
+  const { department_id, role, page = 1, limit = 10 } = req.query;
   try {
-    const data = await userService.listPositions({ departmentId: department_id, role });
-    res.status(200).json({ success: true, data });
+    const data = await userService.listPositions({ 
+      departmentId: department_id, 
+      role, 
+      page: parseInt(page), 
+      limit: parseInt(limit) 
+    });
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch positions.' });
   }
 };
+
 
 /**
  * Handles creating a new position.
@@ -34,41 +40,45 @@ const updatePosition = async (req, res) => {
     const data = await userService.updatePosition(id, req.body);
     res.status(200).json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to update position.' });
+    res.status(500).json({ success: false, error: error.message || 'Failed to update position.' });
   }
 };
+
 
 /**
  * Handles listing all users. Supports filtering by department_id and role.
  */
 const listUsers = async (req, res) => {
-  const { department_id, role } = req.query;
+  const { department_id, role, page = 1, limit = 10 } = req.query;
   try {
-    const data = await userService.listUsers({ departmentId: department_id, role });
-    res.status(200).json({ success: true, data });
+    const data = await userService.listUsers({ 
+      departmentId: department_id, 
+      role,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    }, req.user.role);
+    res.status(200).json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch users.' });
   }
 };
 
+
+
 /**
- * Handles creating a new user (worker, officer, assistant).
+ * Handles creating a new user (fully position-based).
  */
 const createUser = async (req, res) => {
-  const { name, email, role, department_id, officer_id, can_send_on_behalf, position_id } = req.body;
+  const { name, email, position_id } = req.body;
 
-  if (!name || !email || (!department_id && !position_id)) {
-    return res.status(400).json({ success: false, error: 'Name, email, and either department_id or position_id are required.' });
+  if (!name || !email || !position_id) {
+    return res.status(400).json({ success: false, error: 'Name, email, and position_id are required.' });
   }
 
   try {
     const data = await userService.createUser({ 
       name, 
       email, 
-      role, 
-      department_id, 
-      officer_id, 
-      can_send_on_behalf,
       position_id
     });
     res.status(201).json({ success: true, ...data });
@@ -79,6 +89,7 @@ const createUser = async (req, res) => {
     res.status(500).json({ success: false, error: error.message || 'Failed to create user.' });
   }
 };
+
 
 /**
  * Handles updating a user.

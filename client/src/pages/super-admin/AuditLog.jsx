@@ -13,6 +13,7 @@ import {
   Clock,
   Info
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const AuditLog = () => {
   const [logs, setLogs] = useState([]);
@@ -20,6 +21,11 @@ const AuditLog = () => {
   const [error, setError] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 20;
+
   // Filters
   const [filters, setFilters] = useState({
     action: '',
@@ -31,7 +37,7 @@ const AuditLog = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [currentPage]);
 
   const fetchLogs = async () => {
     try {
@@ -41,9 +47,12 @@ const AuditLog = () => {
       if (filters.entity_type) params.append('entity_type', filters.entity_type);
       if (filters.from) params.append('from', filters.from);
       if (filters.to) params.append('to', filters.to);
+      params.append('page', currentPage);
+      params.append('limit', itemsPerPage);
 
       const response = await api.get(`/audit?${params.toString()}`);
       setLogs(response.data.data || []);
+      setTotalItems(response.data.total || 0);
       setError('');
     } catch (err) {
       setError('Failed to fetch audit logs');
@@ -52,6 +61,7 @@ const AuditLog = () => {
       setIsRefreshing(false);
     }
   };
+
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
@@ -219,7 +229,15 @@ const AuditLog = () => {
           </table>
         </div>
       </div>
+
+      <Pagination
+        total={totalItems}
+        page={currentPage}
+        limit={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
+
   );
 };
 

@@ -14,7 +14,7 @@ const DocumentDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [document, setDocument] = useState(null);
+  const [docData, setDocData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -33,7 +33,7 @@ const DocumentDetail = () => {
     try {
       setLoading(true);
       const response = await api.get(`/documents/${id}`);
-      setDocument(response.data.data);
+      setDocData(response.data.data);
       setError('');
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Failed to fetch document details');
@@ -86,7 +86,7 @@ const DocumentDetail = () => {
     );
   }
 
-  if (error || !document) {
+  if (error || !docData) {
     return (
       <div className="bg-red-50 border-l-4 border-red-400 p-8 rounded-2xl shadow-sm">
         <div className="flex items-center">
@@ -106,10 +106,46 @@ const DocumentDetail = () => {
     );
   }
 
-  const isAssignedToMe = document.assigned_to === user?.id;
-  const canIPickup = document.status === 'in_transit' && 
-    (document.receiver_department_id === user?.department_id || 
-     (document.cc && document.cc.some(r => r.department_id === user?.department_id)));
+  const handleDownload = async () => {
+    try {
+      setIsActionLoading(true);
+      const response = await api.get(`/documents/${id}/attachment`, {
+        responseType: 'blob',
+      });
+      
+      // Create a link element to trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = window.document.createElement('a'); // Explicitly use window.document
+      link.href = url;
+      
+      // Get filename from content-disposition if possible, or fallback
+      const contentDisposition = response.headers['content-disposition'];
+      let fileName = `document_${id}_attachment`;
+      if (contentDisposition) {
+        // Handle both filename="name.ext" and filename=name.ext
+        const fileNameMatch = contentDisposition.match(/filename=(?:"([^"]+)"|([^;]+))/);
+        if (fileNameMatch) {
+          fileName = fileNameMatch[1] || fileNameMatch[2];
+        }
+      }
+      
+      link.setAttribute('download', fileName);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download attachment: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const isAssignedToMe = docData.assigned_to === user?.id;
+  const canIPickup = docData.status === 'in_transit' && 
+    (docData.receiver_department_id === user?.department_id || 
+     (docData.cc && docData.cc.some(r => r.department_id === user?.department_id)));
 
   const rolePath = user.role === 'super_admin' ? 'admin' : user.role;
 
@@ -136,7 +172,7 @@ const DocumentDetail = () => {
               <User size={18} className="mr-2" /> Pick Up Document
             </button>
           )}
-          {isAssignedToMe && document.status === 'picked_up' && (
+          {isAssignedToMe && docData.status === 'picked_up' && (
             <button 
               onClick={() => handleAction('start')}
               disabled={isActionLoading}
@@ -145,7 +181,7 @@ const DocumentDetail = () => {
               <Play size={18} className="mr-2" /> Start Processing
             </button>
           )}
-          {isAssignedToMe && document.status === 'in_progress' && (
+          {isAssignedToMe && docData.status === 'in_progress' && (
             <>
               <button 
                 onClick={() => setIsForwardModalOpen(true)}
@@ -173,24 +209,24 @@ const DocumentDetail = () => {
             {/* Page Header */}
             <div className="bg-slate-50/50 border-b border-slate-100 px-10 py-10">
               <div className="flex justify-between items-start mb-6">
-                <StatusBadge status={document.status} />
+                <StatusBadge status={docData.status} />
                 <div className="flex flex-col items-end gap-2">
-                  {document.outward_number && (
+                  {docData.outward_number && (
                     <span className="text-[10px] font-black font-mono bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200 tracking-wider">
-                      OUT: {document.outward_number}
+                      OUT: {docData.outward_number}
                     </span>
                   )}
-                  {document.inward_number && (
+                  {docData.inward_number && (
                     <span className="text-[10px] font-black font-mono bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200 tracking-wider">
-                      IN: {document.inward_number}
+                      IN: {docData.inward_number}
                     </span>
                   )}
                 </div>
               </div>
               <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-tight mb-4">
-                {document.subject}
+                {docData.subject}
               </h2>
-              {document.is_restricted && (
+              {docData.is_restricted && (
                 <div className="inline-flex items-center bg-amber-50 text-amber-700 px-3 py-1 rounded-lg text-xs font-black border border-amber-100 uppercase tracking-widest">
                   <Lock size={14} className="mr-2" /> This document is restricted
                 </div>
@@ -199,7 +235,7 @@ const DocumentDetail = () => {
 
             {/* Page Body */}
             <div className="p-10 min-h-[600px]">
-              {document.is_redacted ? (
+              {docData.is_redacted ? (
                 <div className="bg-slate-50 rounded-3xl p-12 text-center border border-dashed border-slate-200">
                   <Lock size={48} className="mx-auto text-slate-200 mb-4" />
                   <h3 className="text-lg font-bold text-slate-800">Restricted Content</h3>
@@ -209,24 +245,27 @@ const DocumentDetail = () => {
                 </div>
               ) : (
                 <div className="prose prose-slate lg:prose-lg max-w-none">
-                  {document.body_html ? (
-                    <div dangerouslySetInnerHTML={{ __html: document.body_html }} />
+                  {docData.body_html ? (
+                    <div dangerouslySetInnerHTML={{ __html: docData.body_html }} />
                   ) : (
-                    <p className="whitespace-pre-wrap">{document.body || 'No description provided.'}</p>
+                    <p className="whitespace-pre-wrap">{docData.body || 'No description provided.'}</p>
                   )}
                 </div>
               )}
 
-              {document.file_path && !document.is_redacted && (
+              {docData.file_path && !docData.is_redacted && (
                 <div className="mt-16 pt-8 border-t border-slate-100">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">File Attachment</h4>
-                  <div className="inline-flex items-center p-5 bg-white rounded-2xl border-2 border-slate-100 hover:border-indigo-200 transition-all group cursor-pointer shadow-sm">
+                  <div 
+                    onClick={handleDownload}
+                    className="inline-flex items-center p-5 bg-white rounded-2xl border-2 border-slate-100 hover:border-indigo-200 transition-all group cursor-pointer shadow-sm"
+                  >
                     <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600 mr-4 group-hover:bg-indigo-100 transition-colors">
                       <FileText size={28} />
                     </div>
                     <div>
                       <p className="text-sm font-black text-slate-800">
-                        {document.file_path.split(/[\/\\]/).pop()}
+                        {docData.display_filename || docData.file_path.split(/[\/\\]/).pop()}
                       </p>
                       <button className="text-xs text-indigo-600 font-bold flex items-center mt-1 group-hover:text-indigo-800">
                         <Download size={14} className="mr-1" /> Request Download
@@ -239,13 +278,13 @@ const DocumentDetail = () => {
           </div>
 
           {/* Reference Chain */}
-          {document.references && document.references.length > 0 && (
+          {docData.references && docData.references.length > 0 && (
             <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center">
                 <LinkIcon size={12} className="mr-2" /> Associated References
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {document.references.map(ref => (
+                {docData.references.map(ref => (
                   <Link 
                     key={ref.id} 
                     to={`/${rolePath}/document/${ref.id}`}
@@ -276,7 +315,7 @@ const DocumentDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Origin Dept</p>
-                  <p className="text-sm font-bold text-slate-800">{document.sender_department_name}</p>
+                  <p className="text-sm font-bold text-slate-800">{docData.sender_department_name}</p>
                 </div>
               </div>
               <div className="flex items-start">
@@ -285,12 +324,12 @@ const DocumentDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Target Dept</p>
-                  <p className="text-sm font-bold text-slate-800">{document.receiver_department_name}</p>
+                  <p className="text-sm font-bold text-slate-800">{docData.receiver_department_name}</p>
                 </div>
               </div>
 
               {/* CC Recipients */}
-              {document.cc && document.cc.length > 0 && (
+              {docData.cc && docData.cc.length > 0 && (
                 <div className="flex items-start">
                   <div className="bg-slate-50 p-2 rounded-lg text-slate-600 mr-4">
                     <Users size={18} />
@@ -298,7 +337,7 @@ const DocumentDetail = () => {
                   <div>
                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Carbon Copy (CC)</p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {document.cc.map(r => (
+                      {docData.cc.map(r => (
                         <span key={r.id} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
                           {r.department_name}
                         </span>
@@ -314,7 +353,7 @@ const DocumentDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Ownership</p>
-                  <p className="text-sm font-bold text-slate-800">{document.assignee_name || 'Department Inbox'}</p>
+                  <p className="text-sm font-bold text-slate-800">{docData.assignee_name || 'Department Inbox'}</p>
                 </div>
               </div>
               <div className="flex items-start">
@@ -323,7 +362,7 @@ const DocumentDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Dispatch Date</p>
-                  <p className="text-sm font-bold text-slate-800">{new Date(document.created_at).toLocaleString()}</p>
+                  <p className="text-sm font-bold text-slate-800">{new Date(docData.created_at).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -332,7 +371,7 @@ const DocumentDetail = () => {
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 border-b border-slate-50 pb-4">Audit Footprint</h3>
             <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              <AuditTimeline logs={document.audit_logs} />
+              <AuditTimeline logs={docData.audit_logs} />
             </div>
           </div>
         </div>
