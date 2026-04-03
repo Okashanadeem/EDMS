@@ -79,6 +79,24 @@
 
 ---
 
+## 🚀 Phase 1.2: Digital Signatures & PDF Engine (In Progress)
+
+### 🧩 Milestone 11: Signature Management
+- [ ] Database: Add `signature_path` to `users` table.
+- [ ] Backend: Signature Upload API with `multer`.
+- [ ] Backend: Image Processing Service (Background removal & normalization).
+- [ ] Frontend: Signature Upload & Preview UI in User Management (Super Admin).
+- [ ] Frontend: Officer Dashboard "Update Signature" component.
+
+### 🧩 Milestone 12: Official Document Engine (PDF)
+- [ ] Backend: HTML-to-PDF Generation Service.
+- [ ] Backend: POV-aware PDF Download endpoint (`GET /documents/:id/pdf`).
+- [ ] Backend: Signature stamping logic for delegated dispatches.
+- [ ] Frontend: "Download Official Letter" button in Document Detail.
+- [ ] UI: Official Letterhead & Layout Design.
+
+---
+
 ## 🛠️ Phase 2: Enhanced Capabilities (Planned)
 - [ ] S3 Storage provider implementation
 - [ ] Full-text search activación (using GIN indexes)

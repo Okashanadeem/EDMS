@@ -11,6 +11,12 @@ const router = express.Router();
 router.post('/login', authController.login);
 
 /**
+ * @route GET /api/v1/auth/me
+ * @access auth
+ */
+router.get('/me', authMiddleware, authController.getProfile);
+
+/**
  * @route POST /api/v1/auth/logout
  * @access auth
  */

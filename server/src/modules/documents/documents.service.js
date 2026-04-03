@@ -495,20 +495,29 @@ const listAllDocuments = async ({ department_id, status, assigned_to, q, page = 
  */
 const getDocumentDetail = async (id, userId, role, userDeptId) => {
   // 1. Basic Info
+  // We join users for creator signature AND we join users AGAIN via position_id to get current occupant's signature
   const docQuery = `
     SELECT 
       d.*, 
       u.name as creator_name, 
+      u.signature_path as creator_signature_path,
+      u.role as creator_role,
       p.title as behalf_of_position_title,
       sd.name as sender_department_name, 
       rd.name as receiver_department_name, 
-      au.name as assignee_name
+      au.name as assignee_name,
+      ou.name as officer_name,
+      ou.signature_path as officer_signature_path,
+      op.title as officer_position_title
     FROM documents d
     JOIN users u ON d.created_by = u.id
     LEFT JOIN positions p ON d.behalf_of_position_id = p.id
     JOIN departments sd ON d.sender_department_id = sd.id
     JOIN departments rd ON d.receiver_department_id = rd.id
     LEFT JOIN users au ON d.assigned_to = au.id
+    -- Dynamic link: Get current person holding the officer position
+    LEFT JOIN users ou ON d.behalf_of_position_id = ou.position_id
+    LEFT JOIN positions op ON ou.position_id = op.id
     WHERE d.id = $1
   `;
   const docResult = await db.query(docQuery, [id]);

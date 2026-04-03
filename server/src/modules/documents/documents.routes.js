@@ -50,6 +50,12 @@ router.get('/:id', authMiddleware, documentController.getDocumentDetail);
 router.get('/:id/attachment', authMiddleware, documentController.downloadAttachment);
 
 /**
+ * @route GET /api/v1/documents/:id/pdf
+ * @access authenticated
+ */
+router.get('/:id/pdf', authMiddleware, documentController.downloadDocumentPdf);
+
+/**
  * @route POST /api/v1/documents
  * @access worker, officer
  */

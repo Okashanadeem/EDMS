@@ -18,10 +18,11 @@ import {
   RefreshCw
 } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
+import SignatureManager from '../../components/SignatureManager';
 
 const OfficerDashboard = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, setUser, refreshUser } = useAuth();
   const [stats, setStats] = useState({
     inbox_count: 0,
     draft_review_count: 0,
@@ -33,6 +34,7 @@ const OfficerDashboard = () => {
   const [updatingProfile, setUpdatingProfile] = useState(false);
 
   useEffect(() => {
+    refreshUser(); // Fetch latest profile (including signature)
     fetchDashboardData();
   }, []);
 
@@ -79,6 +81,12 @@ const OfficerDashboard = () => {
     } finally {
       setUpdatingProfile(false);
     }
+  };
+
+  const handleSignatureSuccess = (newPath) => {
+    const updatedUser = { ...user, signature_path: newPath };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const statCards = [
@@ -134,13 +142,19 @@ const OfficerDashboard = () => {
               <TrendingUp size={16} className="text-slate-200 group-hover:text-indigo-400 transition-colors" />
             </div>
             <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">{card.label}</h3>
-            <div className="flex items-baseline space-x-2 mt-1">
+            <div className="flex baseline space-x-2 mt-1">
               <p className="text-4xl font-black text-slate-900">{loading ? '...' : card.value}</p>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter">{card.desc}</p>
             </div>
           </Link>
         ))}
       </div>
+
+      <SignatureManager 
+        userId={user?.id} 
+        currentSignature={user?.signature_path} 
+        onUploadSuccess={handleSignatureSuccess}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">

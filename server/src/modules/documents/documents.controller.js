@@ -337,6 +337,71 @@ const downloadAttachment = async (req, res) => {
 };
 
 
+const { generateOfficialPdf } = require('../../utils/pdfGenerator');
+
+/**
+ * Handles downloading the document as a professional PDF.
+ * POV-aware (Inward vs Outward number and naming).
+ */
+const downloadDocumentPdf = async (req, res) => {
+  const { id } = req.params;
+  const actor = req.user;
+
+  try {
+    const doc = await documentService.getDocumentDetail(id, actor);
+    if (!doc) return res.status(404).json({ success: false, error: 'Document not found.' });
+
+    // 1. Determine POV Number
+    let currentPovNumber = doc.outward_number;
+    let displayName = doc.outward_number || `doc-${id}`;
+    
+    if (actor.department_id === doc.receiver_department_id) {
+      currentPovNumber = doc.inward_number;
+      displayName = doc.inward_number || doc.outward_number || `doc-${id}`;
+    } else {
+      // Check CC/BCC
+      const recipient = doc.recipients?.find(r => r.department_id === actor.department_id);
+      if (recipient) {
+        currentPovNumber = recipient.inward_number;
+        displayName = recipient.inward_number || doc.outward_number || `doc-${id}`;
+      }
+    }
+
+    // 2. Prepare PDF Options
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    let signatureUrl = null;
+    
+    // We prefer the officer's signature if it was a delegated send
+    if (doc.officer_signature_path) {
+      signatureUrl = `${baseUrl}/uploads/${doc.officer_signature_path}`;
+    } else if (doc.creator_signature_path) {
+      signatureUrl = `${baseUrl}/uploads/${doc.creator_signature_path}`;
+    }
+
+    const pdfOptions = {
+      baseUrl,
+      signatureUrl,
+      senderDept: doc.sender_department_name,
+      receiverDept: doc.receiver_department_name,
+      senderName: doc.officer_name || doc.creator_name,
+      senderPosition: doc.officer_position_title || doc.creator_role,
+      currentPovNumber
+    };
+
+    const pdfBuffer = await generateOfficialPdf(doc, pdfOptions);
+
+    const safeFilename = displayName.replace(/\//g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('PDF Download Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate PDF.' });
+  }
+};
+
+
 module.exports = {
   createDocument,
   getInbox,
@@ -348,5 +413,6 @@ module.exports = {
   getDepartmentHistory,
   listAllDocuments,
   getDocumentDetail,
-  downloadAttachment
+  downloadAttachment,
+  downloadDocumentPdf
 };

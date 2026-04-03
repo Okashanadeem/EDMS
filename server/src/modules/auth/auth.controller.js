@@ -28,6 +28,19 @@ const login = async (req, res) => {
 };
 
 /**
+ * Handles fetching the current user profile.
+ */
+const getProfile = async (req, res) => {
+  try {
+    const user = await authService.getProfile(req.user.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found.' });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
  * Handles user logout (stateless).
  */
 const logout = async (req, res) => {
@@ -68,6 +81,7 @@ const changePassword = async (req, res) => {
 
 module.exports = {
   login,
+  getProfile,
   logout,
   changePassword
 };

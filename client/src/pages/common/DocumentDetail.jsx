@@ -6,8 +6,10 @@ import StatusBadge from '../../components/StatusBadge';
 import AuditTimeline from '../../components/AuditTimeline';
 import { 
   ArrowLeft, ArrowRight, Download, Play, CheckCircle, Send, User, 
-  Building2, Calendar, AlertCircle, Clock, FileText, Lock, Link as LinkIcon, Users
+  Building2, Calendar, AlertCircle, Clock, FileText, Lock, Link as LinkIcon, Users,
+  Printer
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const DocumentDetail = () => {
   const { id } = useParams();
@@ -55,9 +57,10 @@ const DocumentDetail = () => {
     try {
       setIsActionLoading(true);
       await api.post(`/documents/${id}/${action}`);
+      toast.success(`Action: ${action} successful`);
       fetchDocumentDetail();
     } catch (err) {
-      alert(err.response?.data?.message || `Failed to ${action} document`);
+      toast.error(err.response?.data?.message || `Failed to ${action} document`);
     } finally {
       setIsActionLoading(false);
     }
@@ -68,10 +71,73 @@ const DocumentDetail = () => {
     try {
       setIsActionLoading(true);
       await api.post(`/documents/${id}/forward`, forwardData);
+      toast.success('Document forwarded to target registry.');
       setIsForwardModalOpen(false);
       fetchDocumentDetail();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to forward document');
+      toast.error(err.response?.data?.message || 'Failed to forward document');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsActionLoading(true);
+      const response = await api.get(`/documents/${id}/pdf`, {
+        responseType: 'blob'
+      });
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `official-letter-${id}.pdf`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Official letter generated.');
+    } catch (err) {
+      toast.error('Failed to generate PDF letter.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setIsActionLoading(true);
+      const response = await api.get(`/documents/${id}/attachment`, {
+        responseType: 'blob',
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = window.document.createElement('a'); 
+      link.href = url;
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let fileName = `attachment-${id}`;
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename=(?:"([^"]+)"|([^;]+))/);
+        if (fileNameMatch) {
+          fileName = fileNameMatch[1] || fileNameMatch[2];
+        }
+      }
+      
+      link.setAttribute('download', fileName);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Attachment downloaded.');
+    } catch (err) {
+      toast.error('Failed to download attachment');
     } finally {
       setIsActionLoading(false);
     }
@@ -105,42 +171,6 @@ const DocumentDetail = () => {
       </div>
     );
   }
-
-  const handleDownload = async () => {
-    try {
-      setIsActionLoading(true);
-      const response = await api.get(`/documents/${id}/attachment`, {
-        responseType: 'blob',
-      });
-      
-      // Create a link element to trigger download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = window.document.createElement('a'); // Explicitly use window.document
-      link.href = url;
-      
-      // Get filename from content-disposition if possible, or fallback
-      const contentDisposition = response.headers['content-disposition'];
-      let fileName = `document_${id}_attachment`;
-      if (contentDisposition) {
-        // Handle both filename="name.ext" and filename=name.ext
-        const fileNameMatch = contentDisposition.match(/filename=(?:"([^"]+)"|([^;]+))/);
-        if (fileNameMatch) {
-          fileName = fileNameMatch[1] || fileNameMatch[2];
-        }
-      }
-      
-      link.setAttribute('download', fileName);
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download error:', err);
-      alert('Failed to download attachment: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
 
   const isAssignedToMe = docData.assigned_to === user?.id;
   const canIPickup = docData.status === 'in_transit' && 
@@ -203,10 +233,8 @@ const DocumentDetail = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content: The Document Page */}
         <div className="lg:col-span-2 space-y-8">
           <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-            {/* Page Header */}
             <div className="bg-slate-50/50 border-b border-slate-100 px-10 py-10">
               <div className="flex justify-between items-start mb-6">
                 <StatusBadge status={docData.status} />
@@ -233,7 +261,6 @@ const DocumentDetail = () => {
               )}
             </div>
 
-            {/* Page Body */}
             <div className="p-10 min-h-[600px]">
               {docData.is_redacted ? (
                 <div className="bg-slate-50 rounded-3xl p-12 text-center border border-dashed border-slate-200">
@@ -253,31 +280,52 @@ const DocumentDetail = () => {
                 </div>
               )}
 
-              {docData.file_path && !docData.is_redacted && (
-                <div className="mt-16 pt-8 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">File Attachment</h4>
+              <div className="mt-16 pt-8 border-t border-slate-100 flex flex-wrap gap-6">
+                {docData.file_path && !docData.is_redacted && (
+                  <div>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">File Attachment</h4>
+                    <div 
+                      onClick={handleDownload}
+                      className="inline-flex items-center p-5 bg-white rounded-2xl border-2 border-slate-100 hover:border-indigo-200 transition-all group cursor-pointer shadow-sm"
+                    >
+                      <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600 mr-4 group-hover:bg-indigo-100 transition-colors">
+                        <FileText size={28} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800">
+                          {docData.display_filename || docData.file_path.split(/[\/\\]/).pop()}
+                        </p>
+                        <button className="text-xs text-indigo-600 font-bold flex items-center mt-1 group-hover:text-indigo-800">
+                          <Download size={14} className="mr-1" /> Request Download
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Official Document</h4>
                   <div 
-                    onClick={handleDownload}
-                    className="inline-flex items-center p-5 bg-white rounded-2xl border-2 border-slate-100 hover:border-indigo-200 transition-all group cursor-pointer shadow-sm"
+                    onClick={handleDownloadPdf}
+                    className="inline-flex items-center p-5 bg-white rounded-2xl border-2 border-slate-100 hover:border-emerald-200 transition-all group cursor-pointer shadow-sm"
                   >
-                    <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600 mr-4 group-hover:bg-indigo-100 transition-colors">
-                      <FileText size={28} />
+                    <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600 mr-4 group-hover:bg-emerald-100 transition-colors">
+                      <Printer size={28} />
                     </div>
                     <div>
                       <p className="text-sm font-black text-slate-800">
-                        {docData.display_filename || docData.file_path.split(/[\/\\]/).pop()}
+                        Official Letter (PDF)
                       </p>
-                      <button className="text-xs text-indigo-600 font-bold flex items-center mt-1 group-hover:text-indigo-800">
-                        <Download size={14} className="mr-1" /> Request Download
+                      <button className="text-xs text-emerald-600 font-bold flex items-center mt-1 group-hover:text-emerald-800">
+                        <Printer size={14} className="mr-1" /> Generate Letter
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Reference Chain */}
           {docData.references && docData.references.length > 0 && (
             <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center">
@@ -304,7 +352,6 @@ const DocumentDetail = () => {
           )}
         </div>
 
-        {/* Sidebar: Metadata & Timeline */}
         <div className="space-y-8">
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 border-b border-slate-50 pb-4">Correspondence Meta</h3>
@@ -328,7 +375,6 @@ const DocumentDetail = () => {
                 </div>
               </div>
 
-              {/* CC Recipients */}
               {docData.cc && docData.cc.length > 0 && (
                 <div className="flex items-start">
                   <div className="bg-slate-50 p-2 rounded-lg text-slate-600 mr-4">
@@ -377,7 +423,6 @@ const DocumentDetail = () => {
         </div>
       </div>
 
-      {/* Forward Leg Modal */}
       {isForwardModalOpen && (
         <div className="fixed inset-0 z-[100] overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
@@ -423,7 +468,7 @@ const DocumentDetail = () => {
                   </div>
                 </div>
                 <div className="bg-slate-50 px-8 py-6 flex flex-row-reverse gap-3">
-                  <button type="submit" disabled={isActionLoading} className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-black text-sm hover:bg-purple-700 transition-all shadow-lg shadow-purple-100">
+                  <button type="submit" disabled={isActionLoading} className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-black text-sm hover:bg-purple-700 transition-all shadow-lg shadow-indigo-100">
                     {isActionLoading ? 'Processing...' : 'Confirm Forward'}
                   </button>
                   <button type="button" onClick={() => setIsForwardModalOpen(false)} className="flex-1 bg-white text-slate-600 py-3 rounded-xl font-black text-sm border border-slate-200 hover:bg-slate-100 transition-all">
