@@ -85,4 +85,10 @@
 94. [x] Integrate OK/Cancel workflow into `Compose.jsx` file selection.
 95. [x] Update `server/src/app.js` CORS settings to expose `Content-Disposition`.
 
+## 🧩 Milestone 19: Granular Cleanup & API Documentation
+96. [x] Implement granular cleanup APIs in `test.service.js` (Documents, Users, Departments, Logs).
+97. [x] Register cleanup routes in `test.routes.js`.
+98. [x] Perform full system API audit to ensure consistency.
+99. [x] Comprehensive update of `Dev/EDMS_Postman_Collection.json` with all endpoints.
+
 

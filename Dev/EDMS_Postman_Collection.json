@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "edms-v1-1-position-collection",
-		"name": "EDMS API - Phase 1.1 (Position-Based)",
-		"description": "Comprehensive Postman collection for the Electronic Document Management System (Phase 1.1). Refactored for Total Position-Based Architecture.",
+		"_postman_id": "edms-v1-1-final-collection",
+		"name": "EDMS API - Final Phase 1.1",
+		"description": "Comprehensive Postman collection for the Electronic Document Management System (Phase 1.1). Total Position-Based Architecture with Multi-POV Attachments and Granular Cleanup.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -58,6 +58,54 @@
 							"path": [
 								"auth",
 								"change-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Departments",
+			"item": [
+				{
+					"name": "List Departments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/departments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"departments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Department",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Counter Terrorism Department\",\n    \"code\": \"CTD\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/departments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"departments"
 							]
 						}
 					},
@@ -163,7 +211,7 @@
 					"response": []
 				},
 				{
-					"name": "Create User (assigned to position)",
+					"name": "Create User",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -183,6 +231,196 @@
 							],
 							"path": [
 								"users"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "List All Documents (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents"
+							],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "My Documents (Ownership)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/mine",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"mine"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Department Inbox",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/inbox",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"inbox"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Department History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/department",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"department"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Document Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Download Attachment (Dynamic POV)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/1/attachment",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"1",
+								"attachment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Document (Direct Dispatch)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "subject", "value": "Operational Alert", "type": "text" },
+								{ "key": "body_html", "value": "<p>Immediate action required.</p>", "type": "text" },
+								{ "key": "receiver_department_id", "value": "2", "type": "text" },
+								{ "key": "cc", "value": "[3]", "type": "text" }
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Pick Up Document",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/documents/1/pickup",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"1",
+								"pickup"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Forward Document",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"to_department_id\": 3,\n    \"note\": \"Forwarding for further investigation.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/documents/1/forward",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"documents",
+								"1",
+								"forward"
 							]
 						}
 					},
@@ -211,15 +449,15 @@
 					"response": []
 				},
 				{
-					"name": "Create Draft (Position-based)",
+					"name": "Create Draft",
 					"request": {
 						"method": "POST",
 						"header": [],
 						"body": {
 							"mode": "formdata",
 							"formdata": [
-								{ "key": "subject", "value": "Budget Review", "type": "text" },
-								{ "key": "body_html", "value": "<h1>Review requested</h1>", "type": "text" },
+								{ "key": "subject", "value": "Draft Report", "type": "text" },
+								{ "key": "body_html", "value": "<h1>Incomplete</h1>", "type": "text" },
 								{ "key": "receiver_department_id", "value": "2", "type": "text" }
 							]
 						},
@@ -236,7 +474,7 @@
 					"response": []
 				},
 				{
-					"name": "Submit Draft (to parent position)",
+					"name": "Submit to Officer",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -255,7 +493,7 @@
 					"response": []
 				},
 				{
-					"name": "Approve Draft (by officer position)",
+					"name": "Approve Draft",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -279,7 +517,7 @@
 			"name": "OTP (Position-Based)",
 			"item": [
 				{
-					"name": "Request OTP (targets parent position)",
+					"name": "Request OTP",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -306,7 +544,7 @@
 					"response": []
 				},
 				{
-					"name": "Verify OTP",
+					"name": "Verify & Dispatch",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -335,10 +573,36 @@
 			]
 		},
 		{
-			"name": "Testing",
+			"name": "Audit Logs",
 			"item": [
 				{
-					"name": "Comprehensive System Cleanup",
+					"name": "System Audit Trail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/audit?page=1&limit=20",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"audit"
+							],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "20" }
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Testing & Cleanup",
+			"item": [
+				{
+					"name": "Total System Reset",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -353,7 +617,96 @@
 								"test",
 								"cleanup"
 							]
-						}
+						},
+						"description": "Deletes everything dynamic, preserves only root superadmin."
+					},
+					"response": []
+				},
+				{
+					"name": "Cleanup All Documents",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "x-internal-test", "value": "true", "type": "text" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/test/cleanup/documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"test",
+								"cleanup",
+								"documents"
+							]
+						},
+						"description": "Deletes all documents, CC/BCC tracking, and inward/outward sequences."
+					},
+					"response": []
+				},
+				{
+					"name": "Cleanup All Users",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "x-internal-test", "value": "true", "type": "text" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/test/cleanup/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"test",
+								"cleanup",
+								"users"
+							]
+						},
+						"description": "Deletes all users except the initial superadmin."
+					},
+					"response": []
+				},
+				{
+					"name": "Cleanup Departments & Positions",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "x-internal-test", "value": "true", "type": "text" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/test/cleanup/departments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"test",
+								"cleanup",
+								"departments"
+							]
+						},
+						"description": "Deletes all departments and positions."
+					},
+					"response": []
+				},
+				{
+					"name": "Cleanup All Logs",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "x-internal-test", "value": "true", "type": "text" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/test/cleanup/logs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"test",
+								"cleanup",
+								"logs"
+							]
+						},
+						"description": "Clears the audit_logs table."
 					},
 					"response": []
 				}
