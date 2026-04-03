@@ -2,6 +2,7 @@ const db = require('../../config/db');
 const bcrypt = require('bcrypt');
 const generateTemporaryPassword = require('../../utils/passwordGenerator');
 const { sendCredentials } = require('../../utils/mailer');
+const { deleteFile } = require('../../utils/storage');
 
 /**
  * Lists all positions.
@@ -17,12 +18,12 @@ const listPositions = async ({ departmentId, role, page = 1, limit = 10 }) => {
   const params = [];
   let index = 1;
 
-  if (departmentId) {
+  if (departmentId && departmentId !== '') {
     query += ` AND p.department_id = $${index++}`;
     params.push(departmentId);
   }
 
-  if (role) {
+  if (role && role !== '') {
     query += ` AND p.role = $${index++}`;
     params.push(role);
   }
@@ -134,12 +135,12 @@ const listUsers = async ({ departmentId, role, page = 1, limit = 10 }, actorRole
     query += ` AND u.role != 'super_admin'`;
   }
 
-  if (departmentId) {
+  if (departmentId && departmentId !== '') {
     query += ` AND u.department_id = $${index++}`;
     params.push(departmentId);
   }
 
-  if (role) {
+  if (role && role !== '') {
     query += ` AND u.role = $${index++}`;
     params.push(role);
   }
@@ -149,7 +150,7 @@ const listUsers = async ({ departmentId, role, page = 1, limit = 10 }, actorRole
     SELECT 
       u.id, u.name, u.email, u.role, u.department_id, 
       d.name as department_name, 
-      u.can_send_on_behalf, u.is_active, u.created_at,
+      u.can_send_on_behalf, u.signature_path, u.is_active, u.created_at,
       u.position_id, p.title as position_title
     ${query} 
     ORDER BY u.name ASC 
@@ -170,7 +171,6 @@ const listUsers = async ({ departmentId, role, page = 1, limit = 10 }, actorRole
 
 /**
  * Creates a new user with a temporary password.
- * Fully position-based. Inherits role, department, and hierarchy from the assigned position.
  */
 const createUser = async ({ name, email, position_id }) => {
   if (!position_id) {
@@ -191,15 +191,11 @@ const createUser = async ({ name, email, position_id }) => {
   const temporaryPassword = generateTemporaryPassword();
 
   const passwordHash = await bcrypt.hash(temporaryPassword, 10);
-
-  // Note: officer_id and can_send_on_behalf are now derived from position hierarchy
-  // but we still store them for performance or legacy if needed, 
-  // though the goal is to deprecate direct user links.
   
   const query = `
     INSERT INTO users (name, email, password_hash, role, department_id, position_id, can_send_on_behalf)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id, name, email, role, department_id, position_id, can_send_on_behalf
+    RETURNING id, name, email, role, department_id, position_id, can_send_on_behalf, signature_path
   `;
   
   const result = await db.query(query, [
@@ -290,10 +286,30 @@ const updateUser = async (id, updates) => {
     UPDATE users 
     SET ${fields.join(', ')} 
     WHERE id = $${index} 
-    RETURNING id, name, email, role, department_id, can_send_on_behalf, is_active, position_id
+    RETURNING id, name, email, role, department_id, can_send_on_behalf, signature_path, is_active, position_id
   `;
   
   const result = await db.query(query, values);
+  return result.rows[0];
+};
+
+/**
+ * Updates a user's signature.
+ */
+const updateSignature = async (userId, signaturePath) => {
+  // 1. Get old signature path to delete
+  const userResult = await db.query('SELECT signature_path FROM users WHERE id = $1', [userId]);
+  const oldPath = userResult.rows[0]?.signature_path;
+
+  // 2. Update DB
+  const query = 'UPDATE users SET signature_path = $1 WHERE id = $2 RETURNING *';
+  const result = await db.query(query, [signaturePath, userId]);
+
+  // 3. Delete old file if exists
+  if (oldPath && oldPath !== signaturePath) {
+    await deleteFile(oldPath);
+  }
+
   return result.rows[0];
 };
 
@@ -338,6 +354,7 @@ module.exports = {
   listUsers,
   createUser,
   updateUser,
+  updateSignature,
   resetPassword,
   deleteUser
 };

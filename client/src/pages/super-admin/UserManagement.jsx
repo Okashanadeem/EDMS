@@ -23,6 +23,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
+import SignatureManager from '../../components/SignatureManager';
 
 const UserManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -107,7 +108,6 @@ const UserManagement = () => {
 
   const fetchAllPositions = async () => {
     try {
-      // Fetch a larger set for the dropdowns
       const response = await api.get(`/users/positions?limit=1000`);
       setPositions(response.data.data || []);
     } catch (err) {
@@ -119,7 +119,6 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const response = await api.get(`/users/positions?page=${posCurrentPage}&limit=${posItemsPerPage}&department_id=${departmentFilter}`);
-      // Only set total if we're on the positions tab to avoid pagination conflicts
       if (activeTab === 'positions') {
         setPositions(response.data.data || []);
         setTotalPositions(response.data.total || 0);
@@ -213,6 +212,13 @@ const UserManagement = () => {
     navigator.clipboard.writeText(generatedPassword);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSignatureSuccess = (newPath) => {
+    if (editingUser) {
+      setUsers(users.map(u => u.id === editingUser.id ? { ...u, signature_path: newPath } : u));
+      setEditingUser({ ...editingUser, signature_path: newPath });
+    }
   };
 
   const filteredUsers = users.filter(u => {
@@ -327,9 +333,9 @@ const UserManagement = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-50">
                   {loading ? (
-                    <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Synchronizing Data...</td></tr>
+                    <tr><td colSpan="6" className="px-6 py-10 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Synchronizing Data...</td></tr>
                   ) : filteredUsers.length === 0 ? (
-                    <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400">No personnel records found.</td></tr>
+                    <tr><td colSpan="6" className="px-6 py-10 text-center text-slate-400">No personnel records found.</td></tr>
                   ) : (
                     filteredUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -487,7 +493,6 @@ const UserManagement = () => {
       </div>
 
       {/* User Modal */}
-
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
@@ -495,24 +500,26 @@ const UserManagement = () => {
               <div className="absolute inset-0 bg-slate-900 opacity-75 backdrop-blur-sm"></div>
             </div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
-            <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
               <form onSubmit={handleUserSubmit}>
-                <div className="bg-white px-8 pt-8 pb-8">
+                <div className="bg-white px-8 pt-8 pb-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingUser ? 'Assign Personnel' : 'Add Personnel'}</h3>
                     <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
                   </div>
                   <div className="space-y-5">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Legal Name</label>
-                      <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
-                      <input type="email" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Legal Name</label>
+                        <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
+                        <input type="email" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                      </div>
                     </div>
 
-                    <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <div className="p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
                       <div className="flex items-center text-indigo-700 mb-4">
                         <Briefcase size={18} className="mr-2" />
                         <p className="text-xs font-black uppercase tracking-wider">Seat Assignment</p>
@@ -520,9 +527,17 @@ const UserManagement = () => {
                       <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Select Functional Position</label>
                       <select 
                         required
-                        className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold text-slate-700" 
+                        className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold text-slate-700 shadow-sm" 
                         value={formData.position_id} 
-                        onChange={(e) => setFormData({...formData, position_id: e.target.value})}
+                        onChange={(e) => {
+                          const posId = e.target.value;
+                          const selectedPos = positions.find(p => String(p.id) === String(posId));
+                          setFormData({
+                            ...formData, 
+                            position_id: posId,
+                            role: selectedPos ? selectedPos.role : formData.role
+                          });
+                        }}
                       >
                         <option value="">-- Choose Position --</option>
                         {positions.map(p => <option key={p.id} value={p.id}>{p.title} ({p.department_name})</option>)}
@@ -532,6 +547,26 @@ const UserManagement = () => {
                       </p>
                     </div>
 
+                    {/* Show signature upload if it's an existing user AND the selected position role is officer/admin */}
+                    {editingUser && (formData.role === 'officer' || formData.role === 'super_admin') ? (
+                      <div className="mt-8 pt-8 border-t border-slate-100">
+                        <div className="flex items-center text-slate-800 mb-4">
+                          <ShieldCheck size={18} className="mr-2 text-blue-500" />
+                          <p className="text-xs font-black uppercase tracking-widest">Signature Intelligence</p>
+                        </div>
+                        <SignatureManager 
+                          userId={editingUser.id} 
+                          currentSignature={editingUser.signature_path} 
+                          onUploadSuccess={handleSignatureSuccess}
+                        />
+                      </div>
+                    ) : !editingUser && (formData.role === 'officer' || formData.role === 'super_admin') ? (
+                      <div className="mt-8 pt-8 border-t border-slate-100 bg-amber-50/50 p-4 rounded-xl border border-dashed border-amber-200">
+                        <p className="text-xs text-amber-700 font-medium text-center italic">
+                          Signature can be uploaded after the user account is created.
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="bg-slate-50 px-8 py-6 flex flex-row-reverse gap-3">

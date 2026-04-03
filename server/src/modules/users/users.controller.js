@@ -1,4 +1,6 @@
 const userService = require('./users.service');
+const { saveSignature } = require('../../utils/storage');
+const { processSignature } = require('../../utils/signature');
 
 /**
  * Handles listing all positions.
@@ -136,6 +138,46 @@ const updateProfile = async (req, res) => {
 };
 
 /**
+ * Handles signature upload and processing.
+ */
+const uploadSignature = async (req, res) => {
+  const { id } = req.params; // Target user ID
+  const actor = req.user;
+
+  // Security: Only super_admin or the user themselves can update signature
+  if (actor.role !== 'super_admin' && String(actor.id) !== String(id)) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to update this signature.' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No image file provided.' });
+  }
+
+  try {
+    // 1. Process with Sharp (background removal, normalization)
+    const processedBuffer = await processSignature(req.file.buffer);
+
+    // 2. Save the PROCESSED buffer to disk
+    const { filename } = await saveSignature(processedBuffer, req.file.originalname.replace(/\.[^/.]+$/, "") + ".png");
+
+    // 3. Update User in DB
+    const data = await userService.updateSignature(id, filename);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Signature processed and updated successfully.',
+      data: {
+        id: data.id,
+        signature_path: data.signature_path
+      }
+    });
+  } catch (error) {
+    console.error('Signature Upload Controller Error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to process signature.' });
+  }
+};
+
+/**
  * Handles password reset for a worker.
  */
 const resetPassword = async (req, res) => {
@@ -177,6 +219,7 @@ module.exports = {
   createUser,
   updateUser,
   updateProfile,
+  uploadSignature,
   resetPassword,
   deleteUser
 };

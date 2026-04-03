@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { Toaster } from 'react-hot-toast';
 
 // Layouts
 import SuperAdminLayout from './layouts/SuperAdminLayout';
@@ -102,7 +103,9 @@ const RoleRedirect = () => {
 
 const App = () => {
   return (
-    <Routes>
+    <>
+      <Toaster position="top-right" reverseOrder={false} />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       
       {/* Super Admin */}
@@ -160,7 +163,8 @@ const App = () => {
       </Route>
 
       <Route path="*" element={<RoleRedirect />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 

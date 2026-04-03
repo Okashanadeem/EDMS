@@ -52,6 +52,7 @@ CREATE TABLE users (
   department_id   INT           REFERENCES departments(id) ON DELETE SET NULL,
   position_id     INT           REFERENCES positions(id) ON DELETE SET NULL,
   can_send_on_behalf BOOLEAN    NOT NULL DEFAULT FALSE,
+  signature_path     TEXT,
   is_active       BOOLEAN       NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 

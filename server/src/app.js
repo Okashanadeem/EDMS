@@ -7,7 +7,9 @@ require('dotenv').config();
 const app = express();
 
 // Global Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
   exposedHeaders: ['Content-Disposition']
 }));

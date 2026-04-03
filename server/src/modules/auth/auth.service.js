@@ -15,7 +15,8 @@ const login = async (email, password) => {
       u.id, u.name, u.email, u.password_hash, u.role, u.department_id, 
       d.name as department_name, 
       p.parent_id as officer_position_id,
-      u.can_send_on_behalf, u.position_id, p.title as position_title
+      u.can_send_on_behalf, u.position_id, p.title as position_title,
+      u.signature_path
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     LEFT JOIN positions p ON u.position_id = p.id
@@ -54,6 +55,26 @@ const login = async (email, password) => {
   return { accessToken, user };
 };
 
+/**
+ * Fetches the latest user profile.
+ */
+const getProfile = async (userId) => {
+  const query = `
+    SELECT 
+      u.id, u.name, u.email, u.role, u.department_id, 
+      d.name as department_name, 
+      p.parent_id as officer_position_id,
+      u.can_send_on_behalf, u.position_id, p.title as position_title,
+      u.signature_path
+    FROM users u
+    LEFT JOIN departments d ON u.department_id = d.id
+    LEFT JOIN positions p ON u.position_id = p.id
+    WHERE u.id = $1 AND u.is_active = TRUE
+  `;
+  const result = await db.query(query, [userId]);
+  return result.rows[0];
+};
+
 
 /**
  * Updates a user's password.
@@ -76,5 +97,6 @@ const changePassword = async (userId, oldPassword, newPassword) => {
 
 module.exports = {
   login,
+  getProfile,
   changePassword
 };

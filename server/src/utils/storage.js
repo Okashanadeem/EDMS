@@ -1,9 +1,16 @@
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const path = require('path');
 require('dotenv').config();
 
 // __dirname is in server/src/utils, so ../../uploads points to server/uploads
 const uploadDir = path.resolve(__dirname, '../../uploads');
+const signatureDir = path.join(uploadDir, 'signatures');
+
+// Ensure signature directory exists
+if (!fsSync.existsSync(signatureDir)) {
+  fsSync.mkdirSync(signatureDir, { recursive: true });
+}
 
 /**
  * Saves a file buffer to local disk.
@@ -20,6 +27,25 @@ const saveFile = async (fileBuffer, originalName) => {
 
   return {
     filename,
+    path: filePath
+  };
+};
+
+/**
+ * Saves a signature file to the signature subdirectory.
+ * @param {Buffer} fileBuffer 
+ * @param {string} originalName 
+ * @returns {Promise<{filename: string, path: string}>}
+ */
+const saveSignature = async (fileBuffer, originalName) => {
+  const ext = path.extname(originalName);
+  const filename = `sig-${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`;
+  const filePath = path.join(signatureDir, filename);
+
+  await fs.writeFile(filePath, fileBuffer);
+
+  return {
+    filename: `signatures/${filename}`,
     path: filePath
   };
 };
@@ -65,7 +91,9 @@ const renameFile = async (oldFilename, newBaseName) => {
 
 module.exports = {
   saveFile,
+  saveSignature,
   deleteFile,
-  renameFile
+  renameFile,
+  uploadDir,
+  signatureDir
 };
-

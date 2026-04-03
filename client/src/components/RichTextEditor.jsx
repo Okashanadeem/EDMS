@@ -106,7 +106,10 @@ const MenuBar = ({ editor }) => {
 const RichTextEditor = ({ content, onChange, readOnly = false }) => {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // StarterKit includes many extensions, but Underline is not one of them.
+        // However, to be safe and clear, we configure it.
+      }),
       Underline,
       TextStyle,
       FontFamily,
